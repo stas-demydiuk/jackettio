@@ -125,7 +125,7 @@ export default class StremThru {
                   name: file.name,
                   size: file.size
                 }));
-                
+
                 if (files.length > 0 && isValidCachedFiles(files)) {
                   cachedResults.push(torrent);
                 }
@@ -289,30 +289,34 @@ export default class StremThru {
 
   async getDownload(file) {
     try {
-      const [magnetId, fileIndex] = file.id.split(':');
-      
-      // Get the magnet information
+      if (!file.id || file.id === 'undefined' || !file.id.includes(':')) {
+        console.error('No valid file.id available');
+        return { notReady: true, errorType: 'not_ready', reason: 'No valid file.id' };
+      }
+
+      const [magnetId] = file.id.split(':');
       const magnetInfo = await this.#request('GET', `/magnets/${magnetId}`);
-      
+
       if (!magnetInfo || !magnetInfo.data) {
         console.error('Failed to get magnet info');
         return { notReady: true, errorType: 'not_ready', reason: 'Failed to get magnet info' };
       }
-      
+
       if (magnetInfo.data.status !== 'downloaded' && magnetInfo.data.status !== 'cached') {
         console.log(`File not ready, status: ${magnetInfo.data.status}`);
         return { notReady: true, errorType: 'not_ready', reason: `File not ready, status: ${magnetInfo.data.status}` };
       }
-      
-      // Find the corresponding file
-      const targetFile = magnetInfo.data.files.find(f => f.index.toString() === fileIndex);
-      
+
+      const targetFile = magnetInfo.data.files.find(f => {
+        const fileName = f.name.split('/').pop();
+        return fileName === file.name || f.name === file.name;
+      });
+
       if (!targetFile || !targetFile.link) {
         console.error('File not found or link not available');
         return { notReady: true, errorType: 'not_ready', reason: 'File not found or link not available' };
       }
-      
-      // Generate the download link
+
       const linkRes = await this.#request('POST', '/link/generate', {
         body: JSON.stringify({ link: targetFile.link })
       });
@@ -325,7 +329,6 @@ export default class StremThru {
       return linkRes.data.link;
     } catch (err) {
       console.error(`Error getting download link: ${err.message}`);
-      // Utiliser analyzeError pour déterminer le type d'erreur
       const errorType = this.constructor.analyzeError(err);
       return { notReady: true, errorType, reason: err.message };
     }

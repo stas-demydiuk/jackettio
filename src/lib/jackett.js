@@ -42,7 +42,8 @@ export async function searchSerieTorrents({indexer, name, year, imdbId, supporte
 
   if(!items){
     const imdbPart = imdbId ? imdbId.replace(/^tt/, '') : '';
-    const query = {t: 'tvsearch', cat: CATEGORY.SERIES, q: imdbPart ? `${name} ${imdbPart}` : `${name}`};
+    // For generic packs, use broad search to let indexer match by title
+    const query = {t: 'search', cat: CATEGORY.SERIES, q: imdbPart ? `${name} ${imdbPart}` : `${name}`};
     if (imdbId && supports('imdbid')) query.imdbid = imdbId.replace(/^tt/, '');
     const res = await jackettApi(
       `/api/v2.0/indexers/${indexer}/results/torznab/api`,

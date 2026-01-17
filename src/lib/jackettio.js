@@ -179,6 +179,13 @@ async function getTorrents(userConfig, metaInfos, debridInstance){
       if(!qualities.includes(torrent.quality))return false;
       const torrentWords = parseWords(torrent.name.toLowerCase());
       if(excludeKeywords.find(word => torrentWords.includes(word)))return false;
+      if(type === 'series'){
+        // If season is present in the name, ensure it matches the requested season
+        const seasonMatch = torrent.name.match(/S(\d{1,2})/i) || torrent.name.match(/season[ ._-]?(\d{1,2})/i);
+        if(seasonMatch && parseInt(seasonMatch[1]) !== season){
+          return false;
+        }
+      }
       return true;
     };
     const filterLanguage = (torrent) => {
@@ -193,10 +200,6 @@ async function getTorrents(userConfig, metaInfos, debridInstance){
       }
       // Allow if the detected year is within the range [requested year - 1, requested year + 1]
       const delta = Math.abs(torrent.year - year);
-      if (torrent.indexerId === 'toloka') {
-        // Toloka often mixes related releases across years; be more permissive
-        return delta <= 2;
-      }
       return delta <= 1;
     };
     const filterSlowIndexer = (indexer) => config.slowIndexerRequest <= 0 || getSlowIndexerStats(indexer.id).count < config.slowIndexerRequest;

@@ -43,7 +43,8 @@ export async function searchSerieTorrents({indexer, name, year, imdbId, supporte
   if(!items){
     const imdbPart = imdbId ? imdbId.replace(/^tt/, '') : '';
     // For generic packs, use broad search to let indexer match by title
-    const query = {t: 'search', cat: CATEGORY.SERIES, q: imdbPart ? `${name} ${imdbPart}` : `${name}`};
+    const query = {t: 'search', q: imdbPart ? `${name} ${imdbPart}` : `${name}`};
+    if (indexer !== 'toloka') query.cat = CATEGORY.SERIES;
     if (imdbId && supports('imdbid')) query.imdbid = imdbId.replace(/^tt/, '');
     const res = await jackettApi(
       `/api/v2.0/indexers/${indexer}/results/torznab/api`,
@@ -66,7 +67,8 @@ export async function searchSeasonTorrents({indexer, name, year, season, imdbId,
 
   if(!items){
     const imdbPart = imdbId ? imdbId.replace(/^tt/, '') : '';
-    const query = {t: 'tvsearch', cat: CATEGORY.SERIES, q: imdbPart ? `${name} ${imdbPart} S${numberPad(season)}` : `${name} S${numberPad(season)}`};
+    const query = {t: 'tvsearch', q: imdbPart ? `${name} ${imdbPart} S${numberPad(season)}` : `${name} S${numberPad(season)}`};
+    if (indexer !== 'toloka') query.cat = CATEGORY.SERIES;
     if (imdbId && supports('imdbid')) query.imdbid = imdbId.replace(/^tt/, '');
     if (supports('season')) query.season = season;
     const res = await jackettApi(
@@ -90,7 +92,8 @@ export async function searchEpisodeTorrents({indexer, name, year, season, episod
 
   if(!items){
     const imdbPart = imdbId ? imdbId.replace(/^tt/, '') : '';
-    const query = {t: 'tvsearch', cat: CATEGORY.SERIES, q: imdbPart ? `${name} ${imdbPart} S${numberPad(season)}E${numberPad(episode)}` : `${name} S${numberPad(season)}E${numberPad(episode)}`};
+    const query = {t: 'tvsearch', q: imdbPart ? `${name} ${imdbPart} S${numberPad(season)}E${numberPad(episode)}` : `${name} S${numberPad(season)}E${numberPad(episode)}`};
+    if (indexer !== 'toloka') query.cat = CATEGORY.SERIES;
     if (imdbId && supports('imdbid')) query.imdbid = imdbId.replace(/^tt/, '');
     if (supports('season')) query.season = season;
     if (supports('ep')) query.ep = episode;

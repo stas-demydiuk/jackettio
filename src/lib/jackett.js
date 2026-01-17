@@ -26,7 +26,9 @@ export async function searchMovieTorrents({indexer, name, year, imdbId, supporte
       query
     );
     items = res?.rss?.channel?.item || [];
-    cache.set(cacheKey, items, {ttl: items.length > 0 ? 3600*36 : 60});
+    if(items.length){
+      cache.set(cacheKey, items, {ttl: 3600*36});
+    }
   }
 
   return normalizeItems(items);
@@ -35,23 +37,43 @@ export async function searchMovieTorrents({indexer, name, year, imdbId, supporte
 
 export async function searchSerieTorrents({indexer, name, year, imdbId, supportedParams = []}){
   const supports = (param) => supportedParams.includes(param);
+  const baseName = name.includes(':') ? name.split(':')[0] : name;
 
   indexer = indexer || 'all';
   const cacheKey = `jackettItems:3:serie:${indexer}:${name}:${year}:${imdbId || '-'}`;
   let items = await cache.get(cacheKey);
 
   if(!items){
-    const imdbPart = imdbId ? imdbId.replace(/^tt/, '') : '';
-    // For generic packs, use broad search to let indexer match by title
-    const query = {t: 'search', q: imdbPart ? `${name} ${imdbPart}` : `${name}`};
-    if (indexer !== 'toloka') query.cat = CATEGORY.SERIES;
-    if (imdbId && supports('imdbid')) query.imdbid = imdbId.replace(/^tt/, '');
-    const res = await jackettApi(
-      `/api/v2.0/indexers/${indexer}/results/torznab/api`,
-      query
-    );
-    items = res?.rss?.channel?.item || [];
-    cache.set(cacheKey, items, {ttl: items.length > 0 ? 3600*36 : 60});
+    // Toloka does not handle imdb/season/ep well, keep simple title searches
+    if(indexer === 'toloka'){
+      const queries = [name, baseName].filter(Boolean);
+      for(const q of queries){
+        const res = await jackettApi(`/api/v2.0/indexers/${indexer}/results/torznab/api`, {t: 'search', q});
+        items = res?.rss?.channel?.item || [];
+        if(items.length)break;
+      }
+    }else{
+      const imdbPart = imdbId ? imdbId.replace(/^tt/, '') : '';
+      // For generic packs, use broad search to let indexer match by title
+      const query = {t: 'search', q: imdbPart ? `${name} ${imdbPart}` : `${name}`, cat: CATEGORY.SERIES};
+      if (imdbId && supports('imdbid')) query.imdbid = imdbId.replace(/^tt/, '');
+      const res = await jackettApi(
+        `/api/v2.0/indexers/${indexer}/results/torznab/api`,
+        query
+      );
+      items = res?.rss?.channel?.item || [];
+
+      if(!items.length && baseName !== name){
+        const altQuery = {t: 'search', q: baseName, cat: CATEGORY.SERIES};
+        items = (await jackettApi(
+          `/api/v2.0/indexers/${indexer}/results/torznab/api`,
+          altQuery
+        ))?.rss?.channel?.item || [];
+      }
+    }
+    if(items.length){
+      cache.set(cacheKey, items, {ttl: 3600*36});
+    }
   }
 
   return normalizeItems(items);
@@ -60,23 +82,46 @@ export async function searchSerieTorrents({indexer, name, year, imdbId, supporte
 
 export async function searchSeasonTorrents({indexer, name, year, season, imdbId, supportedParams = []}){
   const supports = (param) => supportedParams.includes(param);
+  const baseName = name.includes(':') ? name.split(':')[0] : name;
 
   indexer = indexer || 'all';
   const cacheKey = `jackettItems:3:season:${indexer}:${name}:${year}:${season}:${imdbId || '-'}`;
   let items = await cache.get(cacheKey);
 
   if(!items){
-    const imdbPart = imdbId ? imdbId.replace(/^tt/, '') : '';
-    const query = {t: 'tvsearch', q: imdbPart ? `${name} ${imdbPart} S${numberPad(season)}` : `${name} S${numberPad(season)}`};
-    if (indexer !== 'toloka') query.cat = CATEGORY.SERIES;
-    if (imdbId && supports('imdbid')) query.imdbid = imdbId.replace(/^tt/, '');
-    if (supports('season')) query.season = season;
-    const res = await jackettApi(
-      `/api/v2.0/indexers/${indexer}/results/torznab/api`,
-      query
-    );
-    items = res?.rss?.channel?.item || [];
-    cache.set(cacheKey, items, {ttl: items.length > 0 ? 3600*36 : 60});
+    if(indexer === 'toloka'){
+      const queries = [
+        `${name} S${numberPad(season)}`,
+        `${baseName} S${numberPad(season)}`,
+        baseName
+      ].filter(Boolean);
+      for(const q of queries){
+        const res = await jackettApi(`/api/v2.0/indexers/${indexer}/results/torznab/api`, {t: 'search', q});
+        items = res?.rss?.channel?.item || [];
+        if(items.length)break;
+      }
+    }else{
+      const imdbPart = imdbId ? imdbId.replace(/^tt/, '') : '';
+      const query = {t: 'tvsearch', q: imdbPart ? `${name} ${imdbPart} S${numberPad(season)}` : `${name} S${numberPad(season)}`, cat: CATEGORY.SERIES};
+      if (imdbId && supports('imdbid')) query.imdbid = imdbId.replace(/^tt/, '');
+      if (supports('season')) query.season = season;
+      const res = await jackettApi(
+        `/api/v2.0/indexers/${indexer}/results/torznab/api`,
+        query
+      );
+      items = res?.rss?.channel?.item || [];
+
+      if(!items.length && baseName !== name){
+        const altQuery = {t: 'tvsearch', q: `${baseName} S${numberPad(season)}`, cat: CATEGORY.SERIES};
+        items = (await jackettApi(
+          `/api/v2.0/indexers/${indexer}/results/torznab/api`,
+          altQuery
+        ))?.rss?.channel?.item || [];
+      }
+    }
+    if(items.length){
+      cache.set(cacheKey, items, {ttl: 3600*36});
+    }
   }
 
   return normalizeItems(items);
@@ -85,24 +130,47 @@ export async function searchSeasonTorrents({indexer, name, year, season, imdbId,
 
 export async function searchEpisodeTorrents({indexer, name, year, season, episode, imdbId, supportedParams = []}){
   const supports = (param) => supportedParams.includes(param);
+  const baseName = name.includes(':') ? name.split(':')[0] : name;
 
   indexer = indexer || 'all';
   const cacheKey = `jackettItems:3:episode:${indexer}:${name}:${year}:${season}:${episode}:${imdbId || '-'}`;
   let items = await cache.get(cacheKey);
 
   if(!items){
-    const imdbPart = imdbId ? imdbId.replace(/^tt/, '') : '';
-    const query = {t: 'tvsearch', q: imdbPart ? `${name} ${imdbPart} S${numberPad(season)}E${numberPad(episode)}` : `${name} S${numberPad(season)}E${numberPad(episode)}`};
-    if (indexer !== 'toloka') query.cat = CATEGORY.SERIES;
-    if (imdbId && supports('imdbid')) query.imdbid = imdbId.replace(/^tt/, '');
-    if (supports('season')) query.season = season;
-    if (supports('ep')) query.ep = episode;
-    const res = await jackettApi(
-      `/api/v2.0/indexers/${indexer}/results/torznab/api`,
-      query
-    );
-    items = res?.rss?.channel?.item || [];
-    cache.set(cacheKey, items, {ttl: items.length > 0 ? 3600*36 : 60});
+    if(indexer === 'toloka'){
+      const queries = [
+        `${name} S${numberPad(season)}E${numberPad(episode)}`,
+        `${baseName} S${numberPad(season)}E${numberPad(episode)}`,
+        baseName
+      ].filter(Boolean);
+      for(const q of queries){
+        const res = await jackettApi(`/api/v2.0/indexers/${indexer}/results/torznab/api`, {t: 'search', q});
+        items = res?.rss?.channel?.item || [];
+        if(items.length)break;
+      }
+    }else{
+      const imdbPart = imdbId ? imdbId.replace(/^tt/, '') : '';
+      const query = {t: 'tvsearch', q: imdbPart ? `${name} ${imdbPart} S${numberPad(season)}E${numberPad(episode)}` : `${name} S${numberPad(season)}E${numberPad(episode)}`, cat: CATEGORY.SERIES};
+      if (imdbId && supports('imdbid')) query.imdbid = imdbId.replace(/^tt/, '');
+      if (supports('season')) query.season = season;
+      if (supports('ep')) query.ep = episode;
+      const res = await jackettApi(
+        `/api/v2.0/indexers/${indexer}/results/torznab/api`,
+        query
+      );
+      items = res?.rss?.channel?.item || [];
+
+      if(!items.length && baseName !== name){
+        const altQuery = {t: 'tvsearch', q: `${baseName} S${numberPad(season)}E${numberPad(episode)}`, cat: CATEGORY.SERIES};
+        items = (await jackettApi(
+          `/api/v2.0/indexers/${indexer}/results/torznab/api`,
+          altQuery
+        ))?.rss?.channel?.item || [];
+      }
+    }
+    if(items.length){
+      cache.set(cacheKey, items, {ttl: 3600*36});
+    }
   }
 
   return normalizeItems(items);

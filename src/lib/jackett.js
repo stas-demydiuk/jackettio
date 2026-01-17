@@ -156,8 +156,6 @@ export async function searchEpisodeTorrents({indexer, name, year, season, episod
   if(!items){
     if(indexer === 'toloka'){
       const queries = [
-        `${name} S${numberPad(season)}E${numberPad(episode)}`,
-        `${baseName} S${numberPad(season)}E${numberPad(episode)}`,
         baseName
       ].filter(Boolean);
       for(const q of queries){

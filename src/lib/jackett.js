@@ -17,7 +17,8 @@ export async function searchMovieTorrents({indexer, name, year, imdbId, supporte
   let items = await cache.get(cacheKey);
 
   if(!items){
-    const query = {t: 'search', cat: CATEGORY.MOVIE, q: name /*, year: year*/};
+    const imdbPart = imdbId ? imdbId.replace(/^tt/, '') : '';
+    const query = {t: 'search', cat: CATEGORY.MOVIE, q: imdbPart ? `${name} ${imdbPart}` : name /*, year: year*/};
     if (imdbId && supports('imdbid')) query.imdbid = imdbId.replace(/^tt/, '');
     const res = await jackettApi(
       `/api/v2.0/indexers/${indexer}/results/torznab/api`,
@@ -40,7 +41,8 @@ export async function searchSerieTorrents({indexer, name, year, imdbId, supporte
   let items = await cache.get(cacheKey);
 
   if(!items){
-    const query = {t: 'search', cat: CATEGORY.SERIES, q: `${name}`};
+    const imdbPart = imdbId ? imdbId.replace(/^tt/, '') : '';
+    const query = {t: 'search', cat: CATEGORY.SERIES, q: imdbPart ? `${name} ${imdbPart}` : `${name}`};
     if (imdbId && supports('imdbid')) query.imdbid = imdbId.replace(/^tt/, '');
     const res = await jackettApi(
       `/api/v2.0/indexers/${indexer}/results/torznab/api`,
@@ -62,7 +64,8 @@ export async function searchSeasonTorrents({indexer, name, year, season, imdbId,
   let items = await cache.get(cacheKey);
 
   if(!items){
-    const query = {t: 'search', cat: CATEGORY.SERIES, q: `${name} S${numberPad(season)}`};
+    const imdbPart = imdbId ? imdbId.replace(/^tt/, '') : '';
+    const query = {t: 'search', cat: CATEGORY.SERIES, q: imdbPart ? `${name} ${imdbPart} S${numberPad(season)}` : `${name} S${numberPad(season)}`};
     if (imdbId && supports('imdbid')) query.imdbid = imdbId.replace(/^tt/, '');
     if (supports('season')) query.season = season;
     const res = await jackettApi(
@@ -85,7 +88,8 @@ export async function searchEpisodeTorrents({indexer, name, year, season, episod
   let items = await cache.get(cacheKey);
 
   if(!items){
-    const query = {t: 'search', cat: CATEGORY.SERIES, q: `${name} S${numberPad(season)}E${numberPad(episode)}`};
+    const imdbPart = imdbId ? imdbId.replace(/^tt/, '') : '';
+    const query = {t: 'search', cat: CATEGORY.SERIES, q: imdbPart ? `${name} ${imdbPart} S${numberPad(season)}E${numberPad(episode)}` : `${name} S${numberPad(season)}E${numberPad(episode)}`};
     if (imdbId && supports('imdbid')) query.imdbid = imdbId.replace(/^tt/, '');
     if (supports('season')) query.season = season;
     if (supports('ep')) query.ep = episode;

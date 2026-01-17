@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import {Parser} from "xml2js";
 import config from './config.js';
 import cache from './cache.js';
-import {numberPad, parseWords} from './util.js';
+import {numberPad} from './util.js';
 
 export const CATEGORY = {
   MOVIE: 2000,
@@ -148,12 +148,12 @@ async function jackettApi(path, query){
 function normalizeItems(items){
   return forceArray(items).map(item => {
     item = mergeDollarKeys(item);
-    const attr = item['torznab:attr'].reduce((obj, item) => {
-      obj[item.name] = item.value;
+    const attrs = forceArray(item['torznab:attr'] || []).reduce((obj, item) => {
+      if (item?.name) obj[item.name] = item.value;
       return obj;
     }, {});
     const quality = item.title.match(/(2160|1080|720|480|360)p/);
-    const title = parseWords(item.title).join(' ');
+    const normalizedTitle = `${item.title || ''}`.toLowerCase();
     // Correction de la regex pour capturer 19xx ou 20xx
     const year = item.title.replace(quality ? quality[1] : '', '').match(/\b(19\d{2}|20\d{2})\b/);
     return {
@@ -163,15 +163,15 @@ function normalizeItems(items){
       id: crypto.createHash('sha1').update(item.guid).digest('hex'),
       size: parseInt(item.size),
       link: item.link,
-      seeders: parseInt(attr.seeders || 0),
-      peers: parseInt(attr.peers || 0),
-      infoHash: attr.infohash || '',
-      magneturl: attr.magneturl || '', 
+      seeders: parseInt(attrs.seeders || 0),
+      peers: parseInt(attrs.peers || 0),
+      infoHash: attrs.infohash || '',
+      magneturl: attrs.magneturl || '', 
       type: item.type,
       quality: quality ? parseInt(quality[1]) : 0,
       // Correction pour utiliser le premier élément du match (l'année complète)
       year: year ? parseInt(year[0]) : 0,
-      languages: config.languages.filter(lang => title.match(lang.pattern))
+      languages: config.languages.filter(lang => lang.pattern.test(normalizedTitle))
     };
   });
 }

@@ -63,6 +63,14 @@ export async function searchSerieTorrents({indexer, name, year, imdbId, supporte
       );
       items = res?.rss?.channel?.item || [];
 
+      if(!items.length && imdbPart){
+        const retryQuery = {t: 'search', q: `${name}`, cat: CATEGORY.SERIES};
+        items = (await jackettApi(
+          `/api/v2.0/indexers/${indexer}/results/torznab/api`,
+          retryQuery
+        ))?.rss?.channel?.item || [];
+      }
+
       if(!items.length && baseName !== name){
         const altQuery = {t: 'search', q: baseName, cat: CATEGORY.SERIES};
         items = (await jackettApi(
@@ -110,6 +118,15 @@ export async function searchSeasonTorrents({indexer, name, year, season, imdbId,
         query
       );
       items = res?.rss?.channel?.item || [];
+
+      if(!items.length && imdbPart){
+        const retryQuery = {t: 'tvsearch', q: `${name} S${numberPad(season)}`, cat: CATEGORY.SERIES};
+        if (supports('season')) retryQuery.season = season;
+        items = (await jackettApi(
+          `/api/v2.0/indexers/${indexer}/results/torznab/api`,
+          retryQuery
+        ))?.rss?.channel?.item || [];
+      }
 
       if(!items.length && baseName !== name){
         const altQuery = {t: 'tvsearch', q: `${baseName} S${numberPad(season)}`, cat: CATEGORY.SERIES};
@@ -159,6 +176,16 @@ export async function searchEpisodeTorrents({indexer, name, year, season, episod
         query
       );
       items = res?.rss?.channel?.item || [];
+
+      if(!items.length && imdbPart){
+        const retryQuery = {t: 'tvsearch', q: `${name} S${numberPad(season)}E${numberPad(episode)}`, cat: CATEGORY.SERIES};
+        if (supports('season')) retryQuery.season = season;
+        if (supports('ep')) retryQuery.ep = episode;
+        items = (await jackettApi(
+          `/api/v2.0/indexers/${indexer}/results/torznab/api`,
+          retryQuery
+        ))?.rss?.channel?.item || [];
+      }
 
       if(!items.length && baseName !== name){
         const altQuery = {t: 'tvsearch', q: `${baseName} S${numberPad(season)}E${numberPad(episode)}`, cat: CATEGORY.SERIES};

@@ -183,6 +183,8 @@ async function getTorrents(userConfig, metaInfos, debridInstance){
     };
     const filterLanguage = (torrent) => {
       if(priotizeLanguages.length == 0)return true;
+      // If we cannot detect language, don't drop the torrent
+      if(!torrent.languages || torrent.languages.length === 0)return true;
       return torrent.languages.find(lang => ['multi'].concat(priotizeLanguages).includes(lang.value));
     };
     const filterYear = (torrent) => {

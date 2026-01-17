@@ -13,7 +13,7 @@ export async function searchMovieTorrents({indexer, name, year, imdbId, supporte
   const supports = (param) => supportedParams.includes(param);
 
   indexer = indexer || 'all';
-  const cacheKey = `jackettItems:2:movie:${indexer}:${name}:${year}:${imdbId || '-'}`;
+  const cacheKey = `jackettItems:3:movie:${indexer}:${name}:${year}:${imdbId || '-'}`;
   let items = await cache.get(cacheKey);
 
   if(!items){
@@ -37,7 +37,7 @@ export async function searchSerieTorrents({indexer, name, year, imdbId, supporte
   const supports = (param) => supportedParams.includes(param);
 
   indexer = indexer || 'all';
-  const cacheKey = `jackettItems:2:serie:${indexer}:${name}:${year}:${imdbId || '-'}`;
+  const cacheKey = `jackettItems:3:serie:${indexer}:${name}:${year}:${imdbId || '-'}`;
   let items = await cache.get(cacheKey);
 
   if(!items){
@@ -62,7 +62,7 @@ export async function searchSeasonTorrents({indexer, name, year, season, imdbId,
   const supports = (param) => supportedParams.includes(param);
 
   indexer = indexer || 'all';
-  const cacheKey = `jackettItems:2:season:${indexer}:${name}:${year}:${season}:${imdbId || '-'}`;
+  const cacheKey = `jackettItems:3:season:${indexer}:${name}:${year}:${season}:${imdbId || '-'}`;
   let items = await cache.get(cacheKey);
 
   if(!items){
@@ -87,7 +87,7 @@ export async function searchEpisodeTorrents({indexer, name, year, season, episod
   const supports = (param) => supportedParams.includes(param);
 
   indexer = indexer || 'all';
-  const cacheKey = `jackettItems:2:episode:${indexer}:${name}:${year}:${season}:${episode}:${imdbId || '-'}`;
+  const cacheKey = `jackettItems:3:episode:${indexer}:${name}:${year}:${season}:${episode}:${imdbId || '-'}`;
   let items = await cache.get(cacheKey);
 
   if(!items){

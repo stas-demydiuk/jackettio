@@ -223,7 +223,16 @@ async function getTorrents(userConfig, metaInfos, debridInstance){
       // Promises for the primary title
       if (primaryTitle) {
         const primaryPromises = indexers.map(indexer => 
-          timeoutIndexerSearch(indexer.id, jackett.searchMovieTorrents({...metaInfos, name: primaryTitle, indexer: indexer.id}), indexerTimeoutSec*1000)
+          timeoutIndexerSearch(
+            indexer.id, 
+            jackett.searchMovieTorrents({
+              ...metaInfos, 
+              name: primaryTitle, 
+              imdbId: metaInfos.imdb_id || metaInfos.id, 
+              indexer: indexer.id
+            }), 
+            indexerTimeoutSec*1000
+          )
         );
         searchPromises.push(...primaryPromises);
       } else {
@@ -272,9 +281,25 @@ async function getTorrents(userConfig, metaInfos, debridInstance){
 
     }else if(type == 'series'){
 
-      const episodesPromises = indexers.map(indexer => timeoutIndexerSearch(indexer.id, jackett.searchEpisodeTorrents({...metaInfos, indexer: indexer.id}), indexerTimeoutSec*1000));
+      const episodesPromises = indexers.map(indexer => timeoutIndexerSearch(
+        indexer.id, 
+        jackett.searchEpisodeTorrents({
+          ...metaInfos, 
+          imdbId: metaInfos.imdb_id || metaInfos.id, 
+          indexer: indexer.id
+        }), 
+        indexerTimeoutSec*1000
+      ));
       // const packsPromises = indexers.map(indexer => promiseTimeout(jackett.searchSeasonTorrents({...metaInfos, indexer: indexer.id}), indexerTimeoutSec*1000).catch(err => []));
-      const packsPromises = indexers.map(indexer => timeoutIndexerSearch(indexer.id, jackett.searchSerieTorrents({...metaInfos, indexer: indexer.id}), indexerTimeoutSec*1000));
+      const packsPromises = indexers.map(indexer => timeoutIndexerSearch(
+        indexer.id, 
+        jackett.searchSerieTorrents({
+          ...metaInfos, 
+          imdbId: metaInfos.imdb_id || metaInfos.id, 
+          indexer: indexer.id
+        }), 
+        indexerTimeoutSec*1000
+      ));
 
       const episodesTorrents = [].concat(...(await Promise.all(episodesPromises))).filter(filterSearch);
       // const packsTorrents = [].concat(...(await Promise.all(packsPromises))).filter(torrent => filterSearch(torrent) && parseWords(torrent.name.toUpperCase()).includes(`S${numberPad(season)}`));

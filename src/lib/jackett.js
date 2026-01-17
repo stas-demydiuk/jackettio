@@ -9,17 +9,19 @@ export const CATEGORY = {
   SERIES: 5000
 };
 
-export async function searchMovieTorrents({indexer, name, year}){
+export async function searchMovieTorrents({indexer, name, year, imdbId}){
 
   indexer = indexer || 'all';
-  const cacheKey = `jackettItems:2:movie:${indexer}:${name}:${year}`;
+  const cacheKey = `jackettItems:2:movie:${indexer}:${name}:${year}:${imdbId || '-'}`;
   let items = await cache.get(cacheKey);
 
   if(!items){
+    const query = {t: 'search', cat: CATEGORY.MOVIE, q: name /*, year: year*/};
+    if (imdbId) query.imdbid = imdbId.replace(/^tt/, '');
     const res = await jackettApi(
       `/api/v2.0/indexers/${indexer}/results/torznab/api`,
       // year is buggy with some indexers
-      {t: 'search', cat: CATEGORY.MOVIE, q: name /*, year: year*/}
+      query
     );
     items = res?.rss?.channel?.item || [];
     cache.set(cacheKey, items, {ttl: items.length > 0 ? 3600*36 : 60});
@@ -29,16 +31,18 @@ export async function searchMovieTorrents({indexer, name, year}){
 
 }
 
-export async function searchSerieTorrents({indexer, name, year}){
+export async function searchSerieTorrents({indexer, name, year, imdbId}){
 
   indexer = indexer || 'all';
-  const cacheKey = `jackettItems:2:serie:${indexer}:${name}:${year}`;
+  const cacheKey = `jackettItems:2:serie:${indexer}:${name}:${year}:${imdbId || '-'}`;
   let items = await cache.get(cacheKey);
 
   if(!items){
+    const query = {t: 'search', cat: CATEGORY.SERIES, q: `${name}`};
+    if (imdbId) query.imdbid = imdbId.replace(/^tt/, '');
     const res = await jackettApi(
       `/api/v2.0/indexers/${indexer}/results/torznab/api`,
-      {t: 'search', cat: CATEGORY.SERIES, q: `${name}`}
+      query
     );
     items = res?.rss?.channel?.item || [];
     cache.set(cacheKey, items, {ttl: items.length > 0 ? 3600*36 : 60});
@@ -48,16 +52,19 @@ export async function searchSerieTorrents({indexer, name, year}){
 
 }
 
-export async function searchSeasonTorrents({indexer, name, year, season}){
+export async function searchSeasonTorrents({indexer, name, year, season, imdbId}){
 
   indexer = indexer || 'all';
-  const cacheKey = `jackettItems:2:season:${indexer}:${name}:${year}:${season}`;
+  const cacheKey = `jackettItems:2:season:${indexer}:${name}:${year}:${season}:${imdbId || '-'}`;
   let items = await cache.get(cacheKey);
 
   if(!items){
+    const query = {t: 'search', cat: CATEGORY.SERIES, q: `${name} S${numberPad(season)}`};
+    if (imdbId) query.imdbid = imdbId.replace(/^tt/, '');
+    query.season = season;
     const res = await jackettApi(
       `/api/v2.0/indexers/${indexer}/results/torznab/api`,
-      {t: 'search', cat: CATEGORY.SERIES, q: `${name} S${numberPad(season)}`}
+      query
     );
     items = res?.rss?.channel?.item || [];
     cache.set(cacheKey, items, {ttl: items.length > 0 ? 3600*36 : 60});
@@ -67,16 +74,20 @@ export async function searchSeasonTorrents({indexer, name, year, season}){
 
 }
 
-export async function searchEpisodeTorrents({indexer, name, year, season, episode}){
+export async function searchEpisodeTorrents({indexer, name, year, season, episode, imdbId}){
 
   indexer = indexer || 'all';
-  const cacheKey = `jackettItems:2:episode:${indexer}:${name}:${year}:${season}:${episode}`;
+  const cacheKey = `jackettItems:2:episode:${indexer}:${name}:${year}:${season}:${episode}:${imdbId || '-'}`;
   let items = await cache.get(cacheKey);
 
   if(!items){
+    const query = {t: 'search', cat: CATEGORY.SERIES, q: `${name} S${numberPad(season)}E${numberPad(episode)}`};
+    if (imdbId) query.imdbid = imdbId.replace(/^tt/, '');
+    query.season = season;
+    query.ep = episode;
     const res = await jackettApi(
       `/api/v2.0/indexers/${indexer}/results/torznab/api`,
-      {t: 'search', cat: CATEGORY.SERIES, q: `${name} S${numberPad(season)}E${numberPad(episode)}`}
+      query
     );
     items = res?.rss?.channel?.item || [];
     cache.set(cacheKey, items, {ttl: items.length > 0 ? 3600*36 : 60});

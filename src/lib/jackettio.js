@@ -192,7 +192,12 @@ async function getTorrents(userConfig, metaInfos, debridInstance){
         return true; // Always allow if no year is detected in the title
       }
       // Allow if the detected year is within the range [requested year - 1, requested year + 1]
-      return Math.abs(torrent.year - year) <= 1;
+      const delta = Math.abs(torrent.year - year);
+      if (torrent.indexerId === 'toloka') {
+        // Toloka often mixes related releases across years; be more permissive
+        return delta <= 2;
+      }
+      return delta <= 1;
     };
     const filterSlowIndexer = (indexer) => config.slowIndexerRequest <= 0 || getSlowIndexerStats(indexer.id).count < config.slowIndexerRequest;
 

@@ -229,7 +229,8 @@ async function getTorrents(userConfig, metaInfos, debridInstance){
               ...metaInfos, 
               name: primaryTitle, 
               imdbId: metaInfos.imdb_id || metaInfos.id, 
-              indexer: indexer.id
+              indexer: indexer.id,
+              supportedParams: indexer.searching.movie.supportedParams
             }), 
             indexerTimeoutSec*1000
           )
@@ -286,7 +287,8 @@ async function getTorrents(userConfig, metaInfos, debridInstance){
         jackett.searchEpisodeTorrents({
           ...metaInfos, 
           imdbId: metaInfos.imdb_id || metaInfos.id, 
-          indexer: indexer.id
+          indexer: indexer.id,
+          supportedParams: indexer.searching.series.supportedParams
         }), 
         indexerTimeoutSec*1000
       ));
@@ -296,7 +298,8 @@ async function getTorrents(userConfig, metaInfos, debridInstance){
         jackett.searchSerieTorrents({
           ...metaInfos, 
           imdbId: metaInfos.imdb_id || metaInfos.id, 
-          indexer: indexer.id
+          indexer: indexer.id,
+          supportedParams: indexer.searching.series.supportedParams
         }), 
         indexerTimeoutSec*1000
       ));

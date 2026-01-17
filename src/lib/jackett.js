@@ -9,7 +9,8 @@ export const CATEGORY = {
   SERIES: 5000
 };
 
-export async function searchMovieTorrents({indexer, name, year, imdbId}){
+export async function searchMovieTorrents({indexer, name, year, imdbId, supportedParams = []}){
+  const supports = (param) => supportedParams.includes(param);
 
   indexer = indexer || 'all';
   const cacheKey = `jackettItems:2:movie:${indexer}:${name}:${year}:${imdbId || '-'}`;
@@ -17,7 +18,7 @@ export async function searchMovieTorrents({indexer, name, year, imdbId}){
 
   if(!items){
     const query = {t: 'search', cat: CATEGORY.MOVIE, q: name /*, year: year*/};
-    if (imdbId) query.imdbid = imdbId.replace(/^tt/, '');
+    if (imdbId && supports('imdbid')) query.imdbid = imdbId.replace(/^tt/, '');
     const res = await jackettApi(
       `/api/v2.0/indexers/${indexer}/results/torznab/api`,
       // year is buggy with some indexers
@@ -31,7 +32,8 @@ export async function searchMovieTorrents({indexer, name, year, imdbId}){
 
 }
 
-export async function searchSerieTorrents({indexer, name, year, imdbId}){
+export async function searchSerieTorrents({indexer, name, year, imdbId, supportedParams = []}){
+  const supports = (param) => supportedParams.includes(param);
 
   indexer = indexer || 'all';
   const cacheKey = `jackettItems:2:serie:${indexer}:${name}:${year}:${imdbId || '-'}`;
@@ -39,7 +41,7 @@ export async function searchSerieTorrents({indexer, name, year, imdbId}){
 
   if(!items){
     const query = {t: 'search', cat: CATEGORY.SERIES, q: `${name}`};
-    if (imdbId) query.imdbid = imdbId.replace(/^tt/, '');
+    if (imdbId && supports('imdbid')) query.imdbid = imdbId.replace(/^tt/, '');
     const res = await jackettApi(
       `/api/v2.0/indexers/${indexer}/results/torznab/api`,
       query
@@ -52,7 +54,8 @@ export async function searchSerieTorrents({indexer, name, year, imdbId}){
 
 }
 
-export async function searchSeasonTorrents({indexer, name, year, season, imdbId}){
+export async function searchSeasonTorrents({indexer, name, year, season, imdbId, supportedParams = []}){
+  const supports = (param) => supportedParams.includes(param);
 
   indexer = indexer || 'all';
   const cacheKey = `jackettItems:2:season:${indexer}:${name}:${year}:${season}:${imdbId || '-'}`;
@@ -60,8 +63,8 @@ export async function searchSeasonTorrents({indexer, name, year, season, imdbId}
 
   if(!items){
     const query = {t: 'search', cat: CATEGORY.SERIES, q: `${name} S${numberPad(season)}`};
-    if (imdbId) query.imdbid = imdbId.replace(/^tt/, '');
-    query.season = season;
+    if (imdbId && supports('imdbid')) query.imdbid = imdbId.replace(/^tt/, '');
+    if (supports('season')) query.season = season;
     const res = await jackettApi(
       `/api/v2.0/indexers/${indexer}/results/torznab/api`,
       query
@@ -74,7 +77,8 @@ export async function searchSeasonTorrents({indexer, name, year, season, imdbId}
 
 }
 
-export async function searchEpisodeTorrents({indexer, name, year, season, episode, imdbId}){
+export async function searchEpisodeTorrents({indexer, name, year, season, episode, imdbId, supportedParams = []}){
+  const supports = (param) => supportedParams.includes(param);
 
   indexer = indexer || 'all';
   const cacheKey = `jackettItems:2:episode:${indexer}:${name}:${year}:${season}:${episode}:${imdbId || '-'}`;
@@ -82,9 +86,9 @@ export async function searchEpisodeTorrents({indexer, name, year, season, episod
 
   if(!items){
     const query = {t: 'search', cat: CATEGORY.SERIES, q: `${name} S${numberPad(season)}E${numberPad(episode)}`};
-    if (imdbId) query.imdbid = imdbId.replace(/^tt/, '');
-    query.season = season;
-    query.ep = episode;
+    if (imdbId && supports('imdbid')) query.imdbid = imdbId.replace(/^tt/, '');
+    if (supports('season')) query.season = season;
+    if (supports('ep')) query.ep = episode;
     const res = await jackettApi(
       `/api/v2.0/indexers/${indexer}/results/torznab/api`,
       query

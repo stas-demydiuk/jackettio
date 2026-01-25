@@ -18,14 +18,24 @@ export async function searchMovieTorrents({indexer, name, year, imdbId, supporte
 
   if(!items){
     const imdbPart = imdbId ? imdbId.replace(/^tt/, '') : '';
-    const query = {t: 'search', cat: CATEGORY.MOVIE, q: imdbPart ? `${name} ${imdbPart}` : name /*, year: year*/};
-    if (imdbId && supports('imdbid')) query.imdbid = imdbId.replace(/^tt/, '');
+    // Many indexers choke if the raw imdb number is appended to the query.
+    // Prefer plain title search, and only send the imdb id via the dedicated param when supported.
+    const query = {t: 'search', cat: CATEGORY.MOVIE, q: name /*, year: year*/};
+    if (imdbId && supports('imdbid')) query.imdbid = imdbPart;
     const res = await jackettApi(
       `/api/v2.0/indexers/${indexer}/results/torznab/api`,
       // year is buggy with some indexers
       query
     );
     items = res?.rss?.channel?.item || [];
+    // If nothing was found and imdb isn't supported, fall back to title + imdb number as a last resort.
+    if(!items.length && imdbPart && !supports('imdbid')){
+      const retryQuery = {t: 'search', cat: CATEGORY.MOVIE, q: `${name} ${imdbPart}`};
+      items = (await jackettApi(
+        `/api/v2.0/indexers/${indexer}/results/torznab/api`,
+        retryQuery
+      ))?.rss?.channel?.item || [];
+    }
     if(items.length){
       cache.set(cacheKey, items, {ttl: 3600*36});
     }
@@ -249,6 +259,7 @@ function normalizeItems(items){
     const normalizedTitle = `${item.title || ''}`.toLowerCase();
     // Correction de la regex pour capturer 19xx ou 20xx
     const year = item.title.replace(quality ? quality[1] : '', '').match(/\b(19\d{2}|20\d{2})\b/);
+    const magnetUrl = attrs.magneturl || attrs.magneturi || '';
     return {
       name: item.title,
       guid: item.guid,
@@ -259,7 +270,9 @@ function normalizeItems(items){
       seeders: parseInt(attrs.seeders || 0),
       peers: parseInt(attrs.peers || 0),
       infoHash: attrs.infohash || '',
-      magneturl: attrs.magneturl || '', 
+      // Keep both camelCase and legacy casing to avoid breaking callers
+      magnetUrl,
+      magneturl: magnetUrl,
       type: item.type,
       quality: quality ? parseInt(quality[1]) : 0,
       // Correction pour utiliser le premier élément du match (l'année complète)

@@ -26,12 +26,15 @@ async function getMediaflowProxyPublicIp(userConfig) {
       return cachedIp;
     }
 
-    const response = await fetch(new URL(`/proxy/ip?api_password=${userConfig.mediaflowApiPassword}`, userConfig.mediaflowProxyUrl).toString(), {
-      method: 'GET',
-      headers: {
-      'Content-Type': 'application/json',
-      },
-    });
+    const response = await fetch(
+      new URL(`/proxy/ip?api_password=${userConfig.mediaflowApiPassword}`, userConfig.mediaflowProxyUrl).toString(),
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -49,7 +52,6 @@ async function getMediaflowProxyPublicIp(userConfig) {
 
   return null;
 }
-
 
 function encodeMediaflowProxyUrl(
   mediaflowProxyUrl,
@@ -82,7 +84,7 @@ function encodeMediaflowProxyUrl(
   return `${baseUrl}?${encodedParams}`;
 }
 
-export async function updateUserConfigWithMediaFlowIp(userConfig){
+export async function updateUserConfigWithMediaFlowIp(userConfig) {
   if (userConfig.enableMediaFlow && userConfig.mediaflowProxyUrl && userConfig.mediaflowApiPassword) {
     const mediaflowPublicIp = await getMediaflowProxyPublicIp(userConfig);
     if (mediaflowPublicIp) {
@@ -92,19 +94,18 @@ export async function updateUserConfigWithMediaFlowIp(userConfig){
   return userConfig;
 }
 
-
 export function applyMediaflowProxyIfNeeded(videoUrl, userConfig) {
   if (userConfig.enableMediaFlow && userConfig.mediaflowProxyUrl && userConfig.mediaflowApiPassword) {
     return encodeMediaflowProxyUrl(
       userConfig.mediaflowProxyUrl,
-      "/proxy/stream",
+      '/proxy/stream',
       videoUrl,
       {
-        api_password: userConfig.mediaflowApiPassword
+        api_password: userConfig.mediaflowApiPassword,
       },
       null,
       {
-        "Content-Disposition": `attachment; filename=${path.basename(videoUrl)}`
+        'Content-Disposition': `attachment; filename=${path.basename(videoUrl)}`,
       }
     );
   }

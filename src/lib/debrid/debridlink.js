@@ -1,21 +1,20 @@
-import {createHash} from 'crypto';
-import {ERROR} from './const.js';
-import {wait} from '../util.js';
+import { createHash } from 'crypto';
+import { ERROR } from './const.js';
+import { wait } from '../util.js';
 
 export default class DebridLink {
-
   static id = 'debridlink';
   static name = 'Debrid-Link';
   static shortName = 'DL';
   static cacheCheckAvailable = false;
   static configFields = [
     {
-      type: 'text', 
-      name: 'debridApiKey', 
-      label: `Debrid-Link API Key`, 
-      required: true, 
-      href: {value: 'https://debrid-link.com/webapp/apikey', label:'Get API Key Here'}
-    }
+      type: 'text',
+      name: 'debridApiKey',
+      label: `Debrid-Link API Key`,
+      required: true,
+      href: { value: 'https://debrid-link.com/webapp/apikey', label: 'Get API Key Here' },
+    },
   ];
 
   #apiKey;
@@ -27,55 +26,52 @@ export default class DebridLink {
     this.#ip = userConfig.ip || '';
   }
 
-  async getTorrentsCached(torrents){
+  async getTorrentsCached(torrents) {
     return [];
   }
 
-  async getProgressTorrents(torrents){
+  async getProgressTorrents(torrents) {
     const res = await this.#request('GET', '/seedbox/list');
     return res.value.reduce((progress, torrent) => {
       progress[torrent.hashString] = {
         percent: torrent.downloadPercent || 0,
-        speed: torrent.downloadSpeed || 0
-      }
+        speed: torrent.downloadSpeed || 0,
+      };
       return progress;
     }, {});
   }
 
-  async getFilesFromHash(infoHash){
+  async getFilesFromHash(infoHash) {
     return this.getFilesFromMagnet(infoHash, infoHash);
   }
 
-  async getFilesFromMagnet(url, infoHash){
-    const body = {url, async: true};
-    const res = await this.#request('POST', `/seedbox/add`, {body});
+  async getFilesFromMagnet(url, infoHash) {
+    const body = { url, async: true };
+    const res = await this.#request('POST', `/seedbox/add`, { body });
     return this.#getFilesFromTorrent(res.value);
   }
 
-  async getFilesFromBuffer(buffer, infoHash){
+  async getFilesFromBuffer(buffer, infoHash) {
     const body = new FormData();
     body.append('file', new Blob([buffer]), 'file.torrent');
-    const res = await this.#request('POST', `/seedbox/add`, {body});
+    const res = await this.#request('POST', `/seedbox/add`, { body });
     return this.#getFilesFromTorrent(res.value);
   }
 
-  async getDownload(file){
-
-    if(!file.ready){
+  async getDownload(file) {
+    if (!file.ready) {
       throw new Error(ERROR.NOT_READY);
     }
 
     return file.url;
-
   }
 
-  async getUserHash(){
+  async getUserHash() {
     return createHash('md5').update(this.#apiKey).digest('hex');
   }
 
-  async #getFilesFromTorrent(torrent){
-
-    if(!torrent.files.length){
+  async #getFilesFromTorrent(torrent) {
+    if (!torrent.files.length) {
       throw new Error(ERROR.NOT_READY);
     }
 
@@ -85,30 +81,28 @@ export default class DebridLink {
         size: file.size,
         id: `${torrent.id}:${index}`,
         url: file.downloadUrl,
-        ready: file.downloadPercent === 100
+        ready: file.downloadPercent === 100,
       };
     });
-
   }
 
-  async #request(method, path, opts){
-
+  async #request(method, path, opts) {
     opts = opts || {};
     opts = Object.assign(opts, {
       method,
       headers: Object.assign(opts.headers || {}, {
         'user-agent': 'Stremio',
-        'accept': 'application/json',
-        'authorization': `Bearer ${this.#apiKey}`
+        accept: 'application/json',
+        authorization: `Bearer ${this.#apiKey}`,
       }),
-      query: Object.assign({ip: this.#ip}, opts.query || {})
+      query: Object.assign({ ip: this.#ip }, opts.query || {}),
     });
 
-    if(method == 'POST'){
-      if(opts.body instanceof FormData){
+    if (method == 'POST') {
+      if (opts.body instanceof FormData) {
         opts.body.append('ip', this.#ip);
-      }else{
-        opts.body = JSON.stringify(Object.assign({ip: this.#ip}, opts.body || {}));
+      } else {
+        opts.body = JSON.stringify(Object.assign({ ip: this.#ip }, opts.body || {}));
         opts.headers['content-type'] = 'application/json';
       }
     }
@@ -117,9 +111,9 @@ export default class DebridLink {
     const res = await fetch(url, opts);
     const data = await res.json();
 
-    if(!data.success){
+    if (!data.success) {
       console.log(data);
-      switch(data.error || ''){
+      switch (data.error || '') {
         case 'badToken':
           throw new Error(ERROR.EXPIRED_API_KEY);
         case 'maxLink':
@@ -136,7 +130,5 @@ export default class DebridLink {
     }
 
     return data;
-
   }
-
 }

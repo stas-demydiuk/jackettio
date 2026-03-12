@@ -18,22 +18,21 @@ The cli script will install, configure, secure and update your addon. **Docker m
 
 Three automatic installation options are available using cli script:
 
-- 1) **Traefik** (recommended) - 
- You must have a domain configured for this machine, ports 80 and 443 must be opened.
- Your Addon will be available on the address: `https://your_domain`
- You can use [noip](https://www.noip.com) to create a free domain.
+- 1. **Traefik** (recommended) -
+     You must have a domain configured for this machine, ports 80 and 443 must be opened.
+     Your Addon will be available on the address: `https://your_domain`
+     You can use [noip](https://www.noip.com) to create a free domain.
 
-- 2) **Localtunnel** - 
- This installation use "[localtunnel](https://localtunnel.me/)" to expose the app on Internet.
- There's no need to configure a domain; you can run it directly on your local machine.
- However, you may encounter limitations imposed by LocalTunnel.
- All requests from the addons will go through LocalTunnel.
- Your Addon will be available on the address like `https://random-id.localtunnel.me`
+- 2. **Localtunnel** -
+     This installation use "[localtunnel](https://localtunnel.me/)" to expose the app on Internet.
+     There's no need to configure a domain; you can run it directly on your local machine.
+     However, you may encounter limitations imposed by LocalTunnel.
+     All requests from the addons will go through LocalTunnel.
+     Your Addon will be available on the address like `https://random-id.localtunnel.me`
 
-- 3) **Local** - 
- Install locally without domain. Stremio App must run in same machine to work.
- Your Addon will be available on the address: `http://localhost`
-
+- 3. **Local** -
+     Install locally without domain. Stremio App must run in same machine to work.
+     Your Addon will be available on the address: `http://localhost`
 
 ```sh
 # Create the directory where you want to store the installation configs
@@ -46,8 +45,8 @@ curl -fsSL https://raw.githubusercontent.com/arvida42/jackettio/master/cli.sh -o
 chmod +x ./cli.sh && ./cli.sh install
 ```
 
-
 ### cli scripts commands details
+
 ```sh
 # Install all containers and configure them
 ./cli.sh install

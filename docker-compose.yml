@@ -1,7 +1,6 @@
-version: "3.3"
+version: '3.3'
 name: jackettio
 services:
-
   flaresolverr:
     image: ghcr.io/flaresolverr/flaresolverr:latest
     container_name: flaresolverr
@@ -43,7 +42,7 @@ services:
     restart: unless-stopped
     volumes:
       - jackettio-data:/data
-    
+
 networks:
   jackettio:
 

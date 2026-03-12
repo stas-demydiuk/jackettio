@@ -119,6 +119,54 @@ function priotizeItems(allItems, priotizeItems, max) {
   return allItems;
 }
 
+// Groups torrents by quality and round-robins across groups (highest quality first).
+// Within each quality group torrents with a preferred language come first, then sorted by seeders desc.
+function selectByQualityGroups(torrents, maxCount, langFilter, qualityOrder) {
+  const groups = new Map();
+  for (const q of qualityOrder) {
+    groups.set(q, []);
+  }
+  for (const torrent of torrents) {
+    if (groups.has(torrent.quality)) {
+      groups.get(torrent.quality).push(torrent);
+    }
+  }
+  for (const group of groups.values()) {
+    group.sort((a, b) => {
+      const aLang = langFilter(a) ? 1 : 0;
+      const bLang = langFilter(b) ? 1 : 0;
+      if (aLang !== bLang) return bLang - aLang; // preferred-language subgroup first
+      return b.seeders - a.seeders; // then seeders desc within each subgroup
+    });
+  }
+  const orderedGroups = qualityOrder.map((q) => groups.get(q)).filter((g) => g && g.length > 0);
+  const result = [];
+  let round = 0;
+  outer: while (true) {
+    let anyLeft = false;
+    for (const group of orderedGroups) {
+      if (round < group.length) {
+        result.push(group[round]);
+        anyLeft = true;
+        if (result.length >= maxCount) break outer;
+      }
+    }
+    if (!anyLeft) break;
+    round++;
+  }
+  // Sort final list: quality desc → preferred language first → seeders desc
+  result.sort((a, b) => {
+    const qA = qualityOrder.indexOf(a.quality);
+    const qB = qualityOrder.indexOf(b.quality);
+    if (qA !== qB) return qA - qB; // lower index = higher quality
+    const lA = langFilter(a) ? 1 : 0;
+    const lB = langFilter(b) ? 1 : 0;
+    if (lA !== lB) return lB - lA; // preferred language first
+    return b.seeders - a.seeders;
+  });
+  return result;
+}
+
 function searchEpisodeFile(files, season, episode) {
   // Traditional formats for TV series
   return (
@@ -300,14 +348,12 @@ async function getTorrents(userConfig, metaInfos, debridInstance) {
       torrents = torrents.filter(filterSearch);
       // console.log(`${stremioId} : ${torrents.length} torrents after filterSearch (removed ${torrentsBeforeSearchFilter - torrents.length}).`);
 
-      torrents = torrents.sort(sortBy(...sortSearch));
-      // console.log(`${stremioId} : ${torrents.length} torrents after initial sort. Top 5:`, torrents.map(t => ({ name: t.name, year: t.year, size: t.size, seeders: t.seeders })).slice(0, 5));
-
-      torrents = priotizeItems(torrents, filterLanguage, Math.max(1, Math.round(maxTorrents * 0.33)));
-      // console.log(`${stremioId} : ${torrents.length} torrents after priotizeItems. Top 5:`, torrents.map(t => ({ name: t.name, year: t.year, size: t.size, seeders: t.seeders })).slice(0, 5));
-
-      torrents = torrents.slice(0, maxTorrents + 2);
-      // console.log(`${stremioId} : ${torrents.length} torrents after slice(0, ${maxTorrents + 2}).`);
+      torrents = selectByQualityGroups(
+        torrents,
+        maxTorrents + 2,
+        filterLanguage,
+        [...qualities].sort((a, b) => b - a)
+      );
     } else if (type == 'series') {
       const episodesPromises = indexers.map((indexer) =>
         timeoutIndexerSearch(
@@ -366,9 +412,13 @@ async function getTorrents(userConfig, metaInfos, debridInstance) {
       // console.log(`${stremioId} : ${torrents.length} torrents found in ${(new Date() - startDate) / 1000}s`);
 
       torrents = torrents.filter(filterYear);
-      torrents = torrents.filter(filterSearch).sort(sortBy(...sortSearch));
-      torrents = priotizeItems(torrents, filterLanguage, Math.max(1, Math.round(maxTorrents * 0.33)));
-      torrents = torrents.slice(0, maxTorrents + 2);
+      torrents = torrents.filter(filterSearch);
+      torrents = selectByQualityGroups(
+        torrents,
+        maxTorrents + 2,
+        filterLanguage,
+        [...qualities].sort((a, b) => b - a)
+      );
 
       if (priotizePackTorrents > 0 && packsTorrents.length && !torrents.find((t) => packsTorrents.includes(t))) {
         const bestPackTorrents = packsTorrents.slice(0, Math.min(packsTorrents.length, priotizePackTorrents));
@@ -465,44 +515,18 @@ async function getTorrents(userConfig, metaInfos, debridInstance) {
 
         // console.log(`${stremioId} : ${cachedTorrents.length} cached torrents on ${debridInstance.shortName}`);
 
-        // Custom function to sort torrents by quality in descending order of resolutions
-        const sortByQuality = (torrents) => {
-          return [...torrents].sort((a, b) => {
-            // Order of qualities: 2160p > 1080p > 720p > 480p > 360p > 0 (Unknown)
-            const qualityOrder = { 2160: 5, 1080: 4, 720: 3, 480: 2, 360: 1, 0: 0 };
-            const qualityA = qualityOrder[a.quality] || 0;
-            const qualityB = qualityOrder[b.quality] || 0;
-
-            if (qualityA !== qualityB) {
-              return qualityB - qualityA; // Sort in descending order by quality
-            }
-
-            // If the qualities are the same, use other sorting criteria
-            for (const [key, reverse] of sortCached) {
-              if (key !== 'quality') {
-                // Ignore the quality criterion since it has already been processed
-                if (a[key] > b[key]) return reverse ? -1 : 1;
-                if (a[key] < b[key]) return reverse ? 1 : -1;
-              }
-            }
-            return 0;
-          });
-        };
-
         // Mark torrents as cached
         cachedTorrents.forEach((torrent) => {
           torrent.isCached = true;
         });
 
-        // Combine all torrents (cached and uncached)
-        let allTorrents = [...cachedTorrents];
-
-        if (!userConfig.hideUncached || !debrid.cacheCheckAvailable) {
-          allTorrents = [...allTorrents, ...uncachedTorrents];
-        }
-
-        // Sort all torrents by quality
-        torrents = priotizeItems(sortByQuality(allTorrents), filterLanguage);
+        // Sort each tier by quality groups (round-robin) with language priority, cached first
+        const qOrder = [...qualities].sort((a, b) => b - a);
+        const visibleUncached = !userConfig.hideUncached || !debrid.cacheCheckAvailable ? uncachedTorrents : [];
+        torrents = [
+          ...selectByQualityGroups(cachedTorrents, cachedTorrents.length, filterLanguage, qOrder),
+          ...selectByQualityGroups(visibleUncached, visibleUncached.length, filterLanguage, qOrder),
+        ];
 
         const progress = await debridInstance.getProgressTorrents(torrents);
         torrents.forEach((torrent) => (torrent.progress = progress[torrent.infos.infoHash] || null));
@@ -809,7 +833,12 @@ function getQualityLabel(torrent) {
     return label + (hasHDR ? ' | HDR' : '');
   };
 
-  return addHDRLabel(addQualityLabel());
+  const addLanguageLabel = (label) => {
+    const emojis = formatLanguages(torrent.languages || [], torrent.name);
+    return emojis.length > 0 ? `${label} \n ${emojis.join(' ')}` : label;
+  };
+
+  return addLanguageLabel(addHDRLabel(addQualityLabel()));
 }
 
 export async function getDownload(userConfig, type, stremioId, torrentId) {

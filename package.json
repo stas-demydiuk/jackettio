@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "node src/index.js",
+    "dev": "nodemon --watch src src/index.js",
     "format": "prettier --write ."
   },
   "keywords": [
@@ -31,6 +32,7 @@
     "xml2js": "^0.6.2"
   },
   "devDependencies": {
+    "nodemon": "^3.1.14",
     "prettier": "^3.8.1"
   }
 }

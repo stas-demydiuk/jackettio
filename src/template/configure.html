@@ -74,7 +74,10 @@
             <input type="text" v-model="form.excludeKeywords" placeholder="keyword1,keyword2" class="form-control" />
             <small class="text-muted">Example: cam,xvid</small>
           </div>
-          <div class="mb-3 d-flex flex-row" v-if="!immulatableUserConfigKeys.includes('hideUncached')">
+          <div
+            class="mb-3 d-flex flex-row"
+            v-if="form.debridEnabled && !immulatableUserConfigKeys.includes('hideUncached')"
+          >
             <div class="form-check form-switch">
               <input class="form-check-input me-1" type="checkbox" v-model="form.hideUncached" id="hideUncached" />
               <label for="hideUncached" class="d-flex flex-column">
@@ -82,13 +85,16 @@
               </label>
             </div>
           </div>
-          <div class="mb-3" v-if="!immulatableUserConfigKeys.includes('sortCached')">
+          <div class="mb-3" v-if="form.debridEnabled && !immulatableUserConfigKeys.includes('sortCached')">
             <label>Cached torrents sorting</label>
             <select v-model="form.sortCached" class="form-select">
               <option v-for="sort in sorts" :value="sort.value">{{sort.label}}</option>
             </select>
           </div>
-          <div class="mb-3" v-if="!immulatableUserConfigKeys.includes('sortUncached') && !form.hideUncached">
+          <div
+            class="mb-3"
+            v-if="form.debridEnabled && !immulatableUserConfigKeys.includes('sortUncached') && !form.hideUncached"
+          >
             <label>Uncached torrents sorting</label>
             <select v-model="form.sortUncached" class="form-select">
               <option v-for="sort in sorts" :value="sort.value">{{sort.label}}</option>
@@ -124,63 +130,79 @@
 
         <h5 class="mt-4">Debrid</h5>
         <div class="ps-2 border-start border-secondary-subtle">
-          <div class="mb-3 d-flex flex-row" v-if="!immulatableUserConfigKeys.includes('forceCacheNextEpisode')">
+          <div class="mb-3 d-flex flex-row">
             <div class="form-check form-switch">
-              <input
-                class="form-check-input me-1"
-                type="checkbox"
-                v-model="form.forceCacheNextEpisode"
-                id="forceCacheNextEpisode"
-              />
-              <label for="forceCacheNextEpisode" class="d-flex flex-column">
-                <span>Prepare the next episode on Debrid. (Recommended)</span>
+              <input class="form-check-input me-1" type="checkbox" v-model="form.debridEnabled" id="debridEnabled" />
+              <label for="debridEnabled" class="d-flex flex-column">
+                <span>Enable Debrid</span>
                 <small class="text-muted"
-                  >Automatically add the next espisode on debrid when not avaiable to instantally stream it
-                  later.</small
+                  >Disable to pass torrent links directly to Stremio (no debrid required).</small
                 >
               </label>
             </div>
           </div>
-
-          <!-- StremThru Configuration -->
-          <div class="mb-3 border-bottom pb-3">
-            <div class="mb-3 d-flex flex-row">
+          <div v-if="form.debridEnabled">
+            <div class="mb-3 d-flex flex-row" v-if="!immulatableUserConfigKeys.includes('forceCacheNextEpisode')">
               <div class="form-check form-switch">
-                <input class="form-check-input me-1" type="checkbox" v-model="form.useStremThru" id="useStremThru" />
-                <label for="useStremThru" class="d-flex flex-column">
-                  <span>Use StremThru as a unified service (Recommended)</span>
+                <input
+                  class="form-check-input me-1"
+                  type="checkbox"
+                  v-model="form.forceCacheNextEpisode"
+                  id="forceCacheNextEpisode"
+                />
+                <label for="forceCacheNextEpisode" class="d-flex flex-column">
+                  <span>Prepare the next episode on Debrid. (Recommended)</span>
                   <small class="text-muted"
-                    >Allows checking if files are cached and using any debrid service via StremThru.</small
+                    >Automatically add the next espisode on debrid when not avaiable to instantally stream it
+                    later.</small
                   >
                 </label>
               </div>
             </div>
-            <div v-if="form.useStremThru" class="mb-3">
-              <label for="stremthruUrl">StremThru URL:</label>
-              <input
-                type="text"
-                v-model="form.stremthruUrl"
-                class="form-control"
-                id="stremthruUrl"
-                placeholder="http://localhost:8080"
-              />
-              <small class="text-muted">The URL of your StremThru instance (for example: http://localhost:8080)</small>
+
+            <!-- StremThru Configuration -->
+            <div class="mb-3 border-bottom pb-3">
+              <div class="mb-3 d-flex flex-row">
+                <div class="form-check form-switch">
+                  <input class="form-check-input me-1" type="checkbox" v-model="form.useStremThru" id="useStremThru" />
+                  <label for="useStremThru" class="d-flex flex-column">
+                    <span>Use StremThru as a unified service (Recommended)</span>
+                    <small class="text-muted"
+                      >Allows checking if files are cached and using any debrid service via StremThru.</small
+                    >
+                  </label>
+                </div>
+              </div>
+              <div v-if="form.useStremThru" class="mb-3">
+                <label for="stremthruUrl">StremThru URL:</label>
+                <input
+                  type="text"
+                  v-model="form.stremthruUrl"
+                  class="form-control"
+                  id="stremthruUrl"
+                  placeholder="http://localhost:8080"
+                />
+                <small class="text-muted"
+                  >The URL of your StremThru instance (for example: http://localhost:8080)</small
+                >
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label>Debrid provider:</label>
+              <select v-model="debrid" class="form-select" @change="form.debridId = debrid.id">
+                <option v-for="option in debrids" :value="option">{{ option.name }}</option>
+              </select>
+            </div>
+            <div v-for="field in debrid.configFields" class="mb-3">
+              <label>{{field.label}}:</label>
+              <small v-if="field.href" class="ms-2"
+                ><a :href="field.href.value" target="_blank" rel="noreferrer">{{field.href.label}}</a></small
+              >
+              <input type="{{field.type}}" v-model="field.value" class="form-control" />
             </div>
           </div>
-
-          <div class="mb-3">
-            <label>Debrid provider:</label>
-            <select v-model="debrid" class="form-select" @change="form.debridId = debrid.id">
-              <option v-for="option in debrids" :value="option">{{ option.name }}</option>
-            </select>
-          </div>
-          <div v-for="field in debrid.configFields" class="mb-3">
-            <label>{{field.label}}:</label>
-            <small v-if="field.href" class="ms-2"
-              ><a :href="field.href.value" target="_blank" rel="noreferrer">{{field.href.label}}</a></small
-            >
-            <input type="{{field.type}}" v-model="field.value" class="form-control" />
-          </div>
+          <!-- end v-if debridEnabled -->
         </div>
 
         <h5 class="mt-4">MediaFlow Proxy</h5>
@@ -272,7 +294,7 @@
         </div>
 
         <div class="my-3 d-flex align-items-center">
-          <button @click="configure" type="button" class="btn btn-primary" :disabled="!debrid.id">
+          <button @click="configure" type="button" class="btn btn-primary" :disabled="form.debridEnabled && !debrid.id">
             {{isUpdate ? 'Update' : 'Install'}}
           </button>
           <div v-if="error" class="text-danger ms-2">{{error}}</div>
@@ -322,7 +344,9 @@
               const savedUserConfig = JSON.parse(atob(config.userConfig));
               Object.assign(defaultUserConfig, savedUserConfig);
               debrid.value = debrids.find((debrid) => debrid.id == savedUserConfig.debridId) || {};
-              debrid.value.configFields.forEach((field) => (field.value = savedUserConfig[field.name] || null));
+              if (debrid.value.configFields) {
+                debrid.value.configFields.forEach((field) => (field.value = savedUserConfig[field.name] || null));
+              }
               isUpdate = true;
             } catch (err) {}
           }
@@ -331,6 +355,7 @@
             maxTorrents: defaultUserConfig.maxTorrents,
             priotizePackTorrents: defaultUserConfig.priotizePackTorrents,
             excludeKeywords: defaultUserConfig.excludeKeywords.join(','),
+            debridEnabled: defaultUserConfig.debridEnabled ?? true,
             debridId: defaultUserConfig.debridId || '',
             hideUncached: defaultUserConfig.hideUncached,
             sortCached: defaultUserConfig.sortCached,
@@ -361,13 +386,17 @@
               userConfig.qualities = qualities.filter((quality) => quality.checked).map((quality) => quality.value);
               userConfig.indexers = indexers.filter((indexer) => indexer.checked).map((indexer) => indexer.value);
               userConfig.excludeKeywords = form.value.excludeKeywords.split(',').filter(Boolean);
-              debrid.value.configFields.forEach((field) => {
-                if (field.required && !field.value) throw new Error(`${field.label} is required`);
-                userConfig[field.name] = field.value;
-              });
 
-              if (!userConfig.debridId) {
-                throw new Error(`Debrid is required`);
+              if (userConfig.debridEnabled) {
+                debrid.value.configFields.forEach((field) => {
+                  if (field.required && !field.value) throw new Error(`${field.label} is required`);
+                  userConfig[field.name] = field.value;
+                });
+                if (!userConfig.debridId) {
+                  throw new Error(`Debrid is required`);
+                }
+              } else {
+                userConfig.debridId = '';
               }
 
               if (!userConfig.qualities.length) {

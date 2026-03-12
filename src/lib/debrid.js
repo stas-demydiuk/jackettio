@@ -15,8 +15,8 @@ const debrid = { debridlink, alldebrid, realdebrid, premiumize, stremthru, pikpa
 export const cacheCheckAvailable = true;
 
 export function instance(userConfig) {
-  if (!debrid[userConfig.debridId]) {
-    throw new Error(`Debrid service "${userConfig.debridId} not exists`);
+  if (!userConfig.debridId || !debrid[userConfig.debridId]) {
+    return null;
   }
 
   // Si StremThru est activé et qu'un service autre que StremThru est sélectionné, utiliser StremThru comme wrapper

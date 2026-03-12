@@ -29,8 +29,7 @@ export default {
   addonName: process.env.ADDON_NAME || 'Jackettio',
   // Addon Description
   addonDescription:
-    process.env.ADDON_DESCRIPTION ||
-    'Stremio addon that resolve streams using Jackett and Debrid. It seamlessly integrates with private trackers.',
+    process.env.ADDON_DESCRIPTION || 'Provides torrent streams from selected torrent providers via Jackett.',
   // Addon Icon
   addonIcon: process.env.ADDON_ICON || 'https://avatars.githubusercontent.com/u/15383019?s=48&v=4',
   // When hosting a public instance with a private tracker, you must configure this setting to:
@@ -81,6 +80,7 @@ export default {
     mediaflowPublicIp: process.env.DEFAULT_MEDIAFLOW_PUBLIC_IP || '',
     useStremThru: (process.env.DEFAULT_USE_STREMTHRU || 'true') === 'true',
     stremthruUrl: process.env.STREMTHRU_URL || 'https://stremthru.13377001.xyz',
+    debridEnabled: (process.env.DEFAULT_DEBRID_ENABLED || 'true') === 'true',
     debridId: process.env.DEFAULT_DEBRID_ID || 'realdebrid',
   },
 

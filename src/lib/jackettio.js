@@ -698,7 +698,9 @@ export async function getStreams(userConfig, type, stremioId, publicUrl) {
 
   return torrents.map((torrent) => {
     const file = getFile(torrent.infos.files || [], type, season, episode) || {};
-    const quality = torrent.quality > 0 ? `(${config.qualities.find((q) => q.value == torrent.quality).label})` : '';
+    const quality =
+      torrent.quality > 0 ? config.qualities.find((q) => q.value == torrent.quality).label : config.qualities[0].label;
+
     const { codecInfo, sourceInfo, audioInfo } = extractMediaInfo(torrent.name);
 
     // Format media information nicely
@@ -731,6 +733,34 @@ export async function getStreams(userConfig, type, stremioId, publicUrl) {
       rows.push(`⬇️ ${torrent.progress.percent}% ${bytesToSize(torrent.progress.speed)}/s`);
     }
 
+    // No debrid — return a direct infoHash-based stream for Stremio's BitTorrent engine
+    if (!debridInstance) {
+      const fileIdx = type === 'series' && file.name ? (torrent.infos.files || []).indexOf(file) : undefined;
+      // Build sources: individual tracker: entries parsed from the magnet URL,
+      // plus dht: for public torrents. Stremio does not support full magnet URIs.
+      const sources = [];
+      if (torrent.infos.magnetUrl) {
+        try {
+          const trackers = new URL(torrent.infos.magnetUrl).searchParams.getAll('tr');
+          trackers.forEach((tr) => sources.push(`tracker:${tr}`));
+        } catch (e) {}
+      }
+      if (!torrent.infos.private) {
+        sources.push(`dht:${torrent.infos.infoHash}`);
+      }
+      return {
+        name: `🧲 ${getQualityLabel(torrent)}`,
+        description: rows.join('\n'),
+        infoHash: torrent.infos.infoHash,
+        ...(fileIdx !== undefined && fileIdx >= 0 ? { fileIdx } : {}),
+        // ...(sources.length ? { sources } : {}),
+        behaviorHints: {
+          bingeGroup: `${config.addonName}-nodebrid-${torrent.quality}`,
+          filename: torrent.infos.name,
+        },
+      };
+    }
+
     // Use the appropriate status icon if available, otherwise default behavior
     let statusIcon = '';
     if (debridInstance.constructor.id === 'stremthru') {
@@ -750,19 +780,44 @@ export async function getStreams(userConfig, type, stremioId, publicUrl) {
     }
 
     return {
-      name: `[${debridInstance.shortName}${statusIcon}] ${userConfig.enableMediaFlow ? '🕵🏼‍♂️ ' : ''}${config.addonName} ${quality}`,
-      title: rows.join('\n'),
+      name: `[${debridInstance.shortName}${statusIcon}] ${userConfig.enableMediaFlow ? '🕵🏼‍♂️ ' : ''}${config.addonName} (${quality})`,
+      description: rows.join('\n'),
       url: torrent.disabled
         ? '#'
         : `${publicUrl}/${btoa(JSON.stringify(userConfig))}/download/${type}/${stremioId}/${torrent.id}/${file.name || torrent.name}`,
       infoHash: torrent.infos.infoHash,
+      behaviorHints: {
+        bingeGroup: `${config.addonName}-${debridInstance.shortName}-${torrent.quality}`,
+        filename: file.name || torrent.name,
+        ...(file.size || torrent.size > 0 ? { videoSize: file.size || torrent.size } : {}),
+      },
     };
   });
+}
+
+function getQualityLabel(torrent) {
+  const addQualityLabel = () => {
+    if (torrent.quality > 0) {
+      return config.qualities.find((q) => q.value == torrent.quality).label;
+    }
+
+    return config.qualities[0].label;
+  };
+
+  const addHDRLabel = (label) => {
+    const hasHDR = /hdr/i.test(torrent.name) || /dolby vision/i.test(torrent.name);
+    return label + (hasHDR ? ' | HDR' : '');
+  };
+
+  return addHDRLabel(addQualityLabel());
 }
 
 export async function getDownload(userConfig, type, stremioId, torrentId) {
   userConfig = await mergeDefaultUserConfig(userConfig);
   const debridInstance = debrid.instance(userConfig);
+  if (!debridInstance) {
+    throw new Error('Debrid is not enabled');
+  }
   const infos = await torrentInfos.getById(torrentId);
   const { id, season, episode } = parseStremioId(stremioId);
   const cacheKey = `download:2:${await debridInstance.getUserHash()}${userConfig.enableMediaFlow ? ':mfp' : ''}:${stremioId}:${torrentId}`;

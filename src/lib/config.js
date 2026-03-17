@@ -5,6 +5,8 @@ dotenv.config();
 export default {
   // Log level: trace, debug, info, warn, error, fatal
   logLevel: process.env.LOG_LEVEL || 'info',
+  // Path to log file. Leave empty to disable file logging
+  logFile: process.env.LOG_FILE || '',
   // Server port
   port: parseInt(process.env.PORT || 4000),
   // https://expressjs.com/en/guide/behind-proxies.html

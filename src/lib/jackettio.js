@@ -1,5 +1,5 @@
 import pLimit from 'p-limit';
-import { parseWords, numberPad, sortBy, bytesToSize, wait, promiseTimeout } from './util.js';
+import { parseWords, numberPad, bytesToSize, wait, promiseTimeout } from './util.js';
 import config from './config.js';
 import logger from './logger.ts';
 import cache from './cache.js';
@@ -9,6 +9,7 @@ import * as meta from './meta.js';
 import * as jackett from './jackett.js';
 import * as debrid from './debrid.js';
 import * as torrentInfos from './torrentInfos.js';
+import { findEpisodeFile, findFileInTorrent } from './processing/findFileInTorrent.ts';
 
 const slowIndexers = {};
 
@@ -101,24 +102,6 @@ function selectByQualityGroups(torrents, maxCount, langFilter, qualityOrder) {
   return result;
 }
 
-function searchEpisodeFile(files, season, episode) {
-  // Traditional formats for TV series
-  return (
-    files.find((file) => file.name.toUpperCase().includes(`S${numberPad(season, 2)}E${numberPad(episode, 3)}`)) || // SXXEYYY
-    files.find((file) => file.name.toUpperCase().includes(`S${numberPad(season, 2)}E${numberPad(episode, 2)}`)) || // SXXEYY
-    files.find((file) => file.name.toUpperCase().includes(`S${season}E${episode}`)) || // SXY
-    files.find((file) => file.name.includes(`${season}${numberPad(episode, 2)}`)) || // XYY
-    // Specific formats for anime
-    files.find((file) => new RegExp(`\\bE(pisode)?\\s*${numberPad(episode, 2)}\\b`, 'i').test(file.name)) ||
-    files.find((file) => new RegExp(`\\bEP\\s*${numberPad(episode, 2)}\\b`, 'i').test(file.name)) ||
-    files.find((file) => new RegExp(`\\[\\s*${numberPad(episode, 2)}\\s*\\]`).test(file.name)) ||
-    files.find((file) => new RegExp(`\\s-\\s*${numberPad(episode, 2)}\\b`).test(file.name)) ||
-    // Simple format with just the episode number (use as last resort)
-    files.find((file) => file.name.includes(`${numberPad(episode, 2)}`)) ||
-    false
-  );
-}
-
 function getSlowIndexerStats(indexerId) {
   slowIndexers[indexerId] = (slowIndexers[indexerId] || []).filter(
     (item) => new Date() - item.date < config.slowIndexerWindow
@@ -153,6 +136,8 @@ async function getTorrents(userConfig, metaInfos, debridInstance) {
     await wait(500);
   }
   actionInProgress.getTorrents[metaInfos.stremioId] = true;
+
+  logger.debug({ userConfig }, `${metaInfos.stremioId} : Get torrents with config`);
 
   try {
     const {
@@ -290,6 +275,8 @@ async function getTorrents(userConfig, metaInfos, debridInstance) {
         [...qualities].sort((a, b) => b - a)
       );
     } else if (type == 'series') {
+      logger.debug(`${stremioId} : Searching torrents for season ${season}, episode ${episode}...`);
+
       const episodesPromises = indexers.map((indexer) =>
         timeoutIndexerSearch(
           indexer.id,
@@ -344,7 +331,7 @@ async function getTorrents(userConfig, metaInfos, debridInstance) {
 
       torrents = [].concat(episodesTorrents, packsTorrents);
 
-      // console.log(`${stremioId} : ${torrents.length} torrents found in ${(new Date() - startDate) / 1000}s`);
+      logger.debug(`${stremioId} : ${torrents.length} torrents found in ${(new Date() - startDate) / 1000}s`);
 
       torrents = torrents.filter(filterYear);
       torrents = torrents.filter(filterSearch);
@@ -395,7 +382,7 @@ async function getTorrents(userConfig, metaInfos, debridInstance) {
     if (debridInstance) {
       try {
         const isValidCachedFiles =
-          type == 'series' ? (files) => !!searchEpisodeFile(files, season, episode) : (files) => true;
+          type == 'series' ? (files) => !!findEpisodeFile(files, season, episode) : (files) => true;
 
         // Get cached torrents and their status
         let statusTorrents = [];
@@ -487,16 +474,6 @@ async function getTorrents(userConfig, metaInfos, debridInstance) {
     return torrents;
   } finally {
     delete actionInProgress.getTorrents[metaInfos.stremioId];
-  }
-}
-
-function getFile(files, type, season, episode) {
-  files = files.sort(sortBy('size', true));
-  if (type == 'movie') {
-    return files[0];
-  } else if (type == 'series') {
-    // Only return the file matching the episode, no fallback to the first file
-    return searchEpisodeFile(files, season, episode);
   }
 }
 
@@ -656,7 +633,8 @@ export async function getStreams(userConfig, type, stremioId, publicUrl) {
   }
 
   return torrents.map((torrent) => {
-    const file = getFile(torrent.infos.files || [], type, season, episode) || {};
+    const file = findFileInTorrent(torrent.infos.files || [], type, season, episode) || {};
+
     const quality =
       torrent.quality > 0 ? config.qualities.find((q) => q.value == torrent.quality).label : config.qualities[0].label;
 
@@ -708,7 +686,7 @@ export async function getStreams(userConfig, type, stremioId, publicUrl) {
         sources.push(`dht:${torrent.infos.infoHash}`);
       }
       return {
-        name: `[D] ${getQualityLabel(torrent)}`,
+        name: `🧲 ${getQualityLabel(torrent)}`,
         description: rows.join('\n'),
         infoHash: torrent.infos.infoHash,
         ...(fileIdx !== undefined && fileIdx >= 0 ? { fileIdx } : {}),
@@ -876,7 +854,7 @@ export async function getDownload(userConfig, type, stremioId, torrentId) {
       };
     }
 
-    const selectedFile = getFile(files, type, season, episode);
+    const selectedFile = findFileInTorrent(files, type, season, episode);
 
     // If no matching file is found, return the not_ready.mp4 video
     if (!selectedFile) {

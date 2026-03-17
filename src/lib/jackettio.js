@@ -3,6 +3,7 @@ import { parseWords, numberPad, sortBy, bytesToSize, wait, promiseTimeout } from
 import config from './config.js';
 import cache from './cache.js';
 import { updateUserConfigWithMediaFlowIp, applyMediaflowProxyIfNeeded } from './mediaflowProxy.js';
+import { extractMediaInfo } from './mediaInfo.ts';
 import * as meta from './meta.js';
 import * as jackett from './jackett.js';
 import * as debrid from './debrid.js';
@@ -13,74 +14,6 @@ const slowIndexers = {};
 const actionInProgress = {
   getTorrents: {},
   getDownload: {},
-};
-
-// Global cache for extractMediaInfo results
-const mediaInfoCache = new Map();
-
-// Helper function to extract codec and source information from torrent name
-const extractMediaInfo = (name) => {
-  // Check if the result is already cached
-  if (mediaInfoCache.has(name)) {
-    return mediaInfoCache.get(name);
-  }
-
-  // Use a single pass for all regular expressions
-  let codecInfo = '';
-  let sourceInfo = '';
-  let audioInfo = '';
-
-  // Video codecs (search once)
-  if (/[Hh][Ee][Vv][Cc]|[Xx]265|[Hh]\.?265/.test(name)) {
-    codecInfo = 'H265';
-  } else if (/[Aa][Vv][Cc]|[Xx]264|[Hh]\.?264/.test(name)) {
-    codecInfo = 'H264';
-  } else if (/[Aa][Vv]1/.test(name)) {
-    codecInfo = 'AV1';
-  }
-
-  // Sources (search once)
-  if (/[Rr][Ee][Mm][Uu][Xx]/.test(name)) {
-    sourceInfo = 'REMUX';
-  } else if (/[Bb][Ll][Uu][Rr][Aa][Yy]|[Bb][Dd][Rr][Ii][Pp]/.test(name)) {
-    sourceInfo = 'BLURAY';
-  } else if (/[Ww][Ee][Bb][ -._]?[Dd][Ll]/.test(name)) {
-    sourceInfo = 'WEB-DL';
-  } else if (/[Ww][Ee][Bb][Rr][Ii][Pp]/.test(name)) {
-    sourceInfo = 'WEBRIP';
-  } else if (/\b[Ww][Ee][Bb]\b/.test(name)) {
-    sourceInfo = 'WEB';
-  } else if (/[Hh][Dd][Tt][Vv]/.test(name)) {
-    sourceInfo = 'HDTV';
-  } else if (/[Dd][Vv][Dd][Rr][Ii][Pp]/.test(name)) {
-    sourceInfo = 'DVDRIP';
-  }
-
-  // Audio (search once)
-  if (/[Dd][Tt][Ss][ -._]?[Hh][Dd]/.test(name)) {
-    audioInfo = 'DTS-HD';
-  } else if (/[Dd][Tt][Ss][ -._]?[Xx]/.test(name)) {
-    audioInfo = 'DTS:X';
-  } else if (/[Aa][Tt][Mm][Oo][Ss]/.test(name)) {
-    audioInfo = 'ATMOS';
-  } else if (/[Tt][Rr][Uu][Ee][Hh][Dd]/.test(name)) {
-    audioInfo = 'TRUEHD';
-  } else if (/[Dd][Dd]\+|[Ee][-_]?[Aa][Cc][-_]?3/.test(name)) {
-    audioInfo = 'DD+';
-  } else if (/[Dd][Dd]/.test(name)) {
-    audioInfo = 'DD';
-  } else if (/[Dd][Tt][Ss]/.test(name)) {
-    audioInfo = 'DTS';
-  } else if (/[Aa][Aa][Cc]/.test(name)) {
-    audioInfo = 'AAC';
-  }
-
-  const result = { codecInfo, sourceInfo, audioInfo };
-
-  // Cache the result
-  mediaInfoCache.set(name, result);
-
-  return result;
 };
 
 function parseStremioId(stremioId) {
@@ -170,9 +103,10 @@ function selectByQualityGroups(torrents, maxCount, langFilter, qualityOrder) {
 function searchEpisodeFile(files, season, episode) {
   // Traditional formats for TV series
   return (
-    files.find((file) => file.name.includes(`S${numberPad(season, 2)}E${numberPad(episode, 3)}`)) ||
-    files.find((file) => file.name.includes(`S${numberPad(season, 2)}E${numberPad(episode, 2)}`)) ||
-    files.find((file) => file.name.includes(`${season}${numberPad(episode, 2)}`)) ||
+    files.find((file) => file.name.toUpperCase().includes(`S${numberPad(season, 2)}E${numberPad(episode, 3)}`)) || // SXXEYYY
+    files.find((file) => file.name.toUpperCase().includes(`S${numberPad(season, 2)}E${numberPad(episode, 2)}`)) || // SXXEYY
+    files.find((file) => file.name.toUpperCase().includes(`S${season}E${episode}`)) || // SXY
+    files.find((file) => file.name.includes(`${season}${numberPad(episode, 2)}`)) || // XYY
     // Specific formats for anime
     files.find((file) => new RegExp(`\\bE(pisode)?\\s*${numberPad(episode, 2)}\\b`, 'i').test(file.name)) ||
     files.find((file) => new RegExp(`\\bEP\\s*${numberPad(episode, 2)}\\b`, 'i').test(file.name)) ||
@@ -725,32 +659,31 @@ export async function getStreams(userConfig, type, stremioId, publicUrl) {
     const quality =
       torrent.quality > 0 ? config.qualities.find((q) => q.value == torrent.quality).label : config.qualities[0].label;
 
-    const { codecInfo, sourceInfo, audioInfo } = extractMediaInfo(torrent.name);
+    const { codecInfo, sourceInfo, audioInfo, hdrInfo } = extractMediaInfo(torrent.name);
 
     // Format media information nicely
     const mediaInfo = [];
     if (codecInfo) mediaInfo.push(`🎬 ${codecInfo}`);
+    if (hdrInfo) mediaInfo.push(`🌈 ${hdrInfo}`);
     if (sourceInfo) mediaInfo.push(`📀 ${sourceInfo}`);
     if (audioInfo) mediaInfo.push(`🔊 ${audioInfo}`);
 
     const rows = [torrent.name];
-    if (type == 'series' && file.name) rows.push(file.name);
+    if (type == 'series' && file.name) rows.push(`📁 ${file.name}`);
     if (torrent.infoText) rows.push(`ℹ️ ${torrent.infoText}`);
-
-    // Format main info line with improved styling
-    rows.push(
-      [
-        `💾 ${bytesToSize(file.size || torrent.size)}`,
-        `👥 ${torrent.seeders}`,
-        `⚙️ ${torrent.indexerId}`,
-        ...formatLanguages(torrent.languages || [], torrent.name),
-      ].join(' ')
-    );
 
     // Add media info if available
     if (mediaInfo.length > 0) {
       rows.push(mediaInfo.join(' '));
     }
+
+    if (torrent.languages?.length > 0) {
+      rows.push(`🌐 ${torrent.languages.map((lang) => `${lang.iso639.toUpperCase()}`).join(', ')}`);
+    }
+
+    // Format main info line with improved styling
+    rows.push(`💾 ${bytesToSize(file.size || torrent.size)} ⬆️ ${torrent.seeders} ⬇️ ${torrent.peers}`);
+    rows.push(`🔗 ${torrent.indexerId}`);
 
     // Only show download progress if there's actual progress (not 0%)
     if (torrent.progress && !torrent.isCached && (torrent.progress.percent > 0 || torrent.progress.speed > 0)) {
@@ -760,6 +693,7 @@ export async function getStreams(userConfig, type, stremioId, publicUrl) {
     // No debrid — return a direct infoHash-based stream for Stremio's BitTorrent engine
     if (!debridInstance) {
       const fileIdx = type === 'series' && file.name ? (torrent.infos.files || []).indexOf(file) : undefined;
+
       // Build sources: individual tracker: entries parsed from the magnet URL,
       // plus dht: for public torrents. Stremio does not support full magnet URIs.
       const sources = [];
@@ -777,10 +711,11 @@ export async function getStreams(userConfig, type, stremioId, publicUrl) {
         description: rows.join('\n'),
         infoHash: torrent.infos.infoHash,
         ...(fileIdx !== undefined && fileIdx >= 0 ? { fileIdx } : {}),
-        // ...(sources.length ? { sources } : {}),
+        ...(sources.length ? { sources } : {}),
         behaviorHints: {
           bingeGroup: `${config.addonName}-nodebrid-${torrent.quality}`,
           filename: torrent.infos.name,
+          videoSize: file.size || torrent.size,
         },
       };
     }

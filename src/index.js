@@ -5,6 +5,7 @@ import localtunnel from 'localtunnel';
 import { rateLimit } from 'express-rate-limit';
 import { readFileSync } from 'fs';
 import config from './lib/config.js';
+import logger from './lib/logger.ts';
 import cache, { vacuum as vacuumCache, clean as cleanCache } from './lib/cache.js';
 import path from 'path';
 import * as meta from './lib/meta.js';
@@ -78,7 +79,7 @@ app.get('/icon', async (req, res) => {
 });
 
 app.use((req, res, next) => {
-  console.log(`${req.method} ${req.path.replace(/\/eyJ[\w\=]+/g, '/*******************')}`);
+  logger.info(`${req.method} ${req.path.replace(/\/eyJ[\w\=]+/g, '/*******************')}`);
   next();
 });
 
@@ -155,7 +156,7 @@ app.get('/:userConfig/stream/:type/:id.json', limiter, async (req, res) => {
 
     return respond(res, { streams });
   } catch (err) {
-    console.log(req.params.id, err);
+    logger.error({ err }, req.params.id);
     return respond(res, { streams: [] });
   }
 });
@@ -189,7 +190,7 @@ app.use('/:userConfig/download/:type/:id/:torrentId/:name?', async (req, res, ne
 
     // Vérifier si le résultat indique que le fichier n'est pas prêt
     if (result.notReady) {
-      console.log(`${req.params.id} : File not ready: ${result.reason || 'Unknown reason'}`);
+      logger.warn(`${req.params.id} : File not ready: ${result.reason || 'Unknown reason'}`);
       res.status(302);
       res.set('location', `/videos/not_ready.mp4`);
       res.send('');
@@ -200,7 +201,7 @@ app.use('/:userConfig/download/:type/:id/:torrentId/:name?', async (req, res, ne
     const url = typeof result === 'string' ? result : result.url;
     const parsed = new URL(url);
     const cut = (value) => (value ? `${value.substr(0, 5)}******${value.substr(-5)}` : '');
-    console.log(
+    logger.info(
       `${req.params.id} : Redirect: ${parsed.protocol}//${parsed.host}${cut(parsed.pathname)}${cut(parsed.search)}`
     );
 
@@ -208,7 +209,7 @@ app.use('/:userConfig/download/:type/:id/:torrentId/:name?', async (req, res, ne
     res.set('location', url);
     res.send('');
   } catch (err) {
-    console.log(req.params.id, err);
+    logger.error({ err }, req.params.id);
 
     switch (err.message) {
       case debrid.ERROR.NOT_READY:
@@ -253,7 +254,7 @@ app.use((req, res) => {
 });
 
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  logger.error({ err }, err.message);
   if (req.xhr) {
     res.status(500).send({ error: 'Something broke!' });
   } else {
@@ -262,10 +263,10 @@ app.use((err, req, res, next) => {
 });
 
 const server = app.listen(config.port, async () => {
-  console.log('───────────────────────────────────────');
-  console.log(`Started addon ${addon.name} v${addon.version}`);
-  console.log(`Server listen at: http://localhost:${config.port}`);
-  console.log('───────────────────────────────────────');
+  logger.info('───────────────────────────────────────');
+  logger.info(`Started addon ${addon.name} v${addon.version}`);
+  logger.info(`Server listen at: http://localhost:${config.port}`);
+  logger.info('───────────────────────────────────────');
 
   let tunnel;
   if (config.localtunnel) {
@@ -274,28 +275,28 @@ const server = app.listen(config.port, async () => {
     await cache.set('localtunnel:subdomain', tunnel.clientId, {
       ttl: 86400 * 365,
     });
-    console.log(`Your addon is available on the following address: ${tunnel.url}/configure`);
-    tunnel.on('close', () => console.log('tunnels are closed'));
+    logger.info(`Your addon is available on the following address: ${tunnel.url}/configure`);
+    tunnel.on('close', () => logger.info('tunnels are closed'));
   }
 
-  icon.download().catch((err) => console.log(`Failed to download icon: ${err}`));
+  icon.download().catch((err) => logger.error({ err }, `Failed to download icon`));
 
   const intervals = [];
   createTorrentFolder();
   intervals.push(setInterval(cleanTorrentFolder, 3600e3));
 
-  vacuumCache().catch((err) => console.log(`Failed to vacuum cache: ${err}`));
+  vacuumCache().catch((err) => logger.error({ err }, `Failed to vacuum cache`));
   intervals.push(setInterval(() => vacuumCache(), 86400e3 * 7));
 
-  cleanCache().catch((err) => console.log(`Failed to clean cache: ${err}`));
+  cleanCache().catch((err) => logger.error({ err }, `Failed to clean cache`));
   intervals.push(setInterval(() => cleanCache(), 3600e3));
 
   function closeGracefully(signal) {
-    console.log(`Received signal to terminate: ${signal}`);
+    logger.info(`Received signal to terminate: ${signal}`);
     if (tunnel) tunnel.close();
     intervals.forEach((interval) => clearInterval(interval));
     server.close(() => {
-      console.log('Server closed');
+      logger.info('Server closed');
       process.kill(process.pid, signal);
     });
   }

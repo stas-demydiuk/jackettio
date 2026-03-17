@@ -1,6 +1,7 @@
 import { createHash } from 'crypto';
 import { ERROR } from './const.js';
 import { wait } from '../util.js';
+import logger from '../logger.ts';
 
 export default class DebridLink {
   static id = 'debridlink';
@@ -112,7 +113,7 @@ export default class DebridLink {
     const data = await res.json();
 
     if (!data.success) {
-      console.log(data);
+      logger.warn({ data }, 'DebridLink API error');
       switch (data.error || '') {
         case 'badToken':
           throw new Error(ERROR.EXPIRED_API_KEY);

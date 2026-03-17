@@ -23,6 +23,7 @@ const StatusCache = {
 import { createHash } from 'crypto';
 import { ERROR } from './const.js';
 import { wait, isVideo } from '../util.js';
+import logger from '../logger.ts';
 
 export default class StremThru {
   static id = 'stremthru';
@@ -136,7 +137,7 @@ export default class StremThru {
           }
         }
       } catch (err) {
-        console.error(`Error checking cache status: ${err.message}`);
+        logger.error({ err }, `Error checking cache status`);
       }
     }
 
@@ -167,7 +168,7 @@ export default class StremThru {
       });
 
       if (!addRes || !addRes.data || !addRes.data.id) {
-        console.error('Failed to add magnet');
+        logger.error('Failed to add magnet');
         return { files: [], errorType: 'not_ready' }; // Retourner un objet avec le type d'erreur
       }
 
@@ -178,14 +179,14 @@ export default class StremThru {
         const magnetInfo = await this.#request('GET', `/magnets/${magnetId}`);
 
         if (!magnetInfo || !magnetInfo.data) {
-          console.error('Failed to get magnet info');
+          logger.error('Failed to get magnet info');
           return { files: [], errorType: 'not_ready' };
         }
 
         // Si le statut est "queued" ou autre chose que "downloaded" ou "cached",
         // renvoyer immédiatement un tableau vide
         if (magnetInfo.data.status !== 'downloaded' && magnetInfo.data.status !== 'cached') {
-          console.log(`Magnet not ready, status: ${magnetInfo.data.status}`);
+          logger.warn(`Magnet not ready, status: ${magnetInfo.data.status}`);
           return { files: [], errorType: 'not_ready' };
         }
 
@@ -204,17 +205,17 @@ export default class StremThru {
             }),
           };
         } else {
-          console.error('No files found in magnet');
+          logger.error('No files found in magnet');
           return { files: [], errorType: 'not_ready' };
         }
       } catch (err) {
-        console.error(`Error checking magnet status: ${err.message}`);
+        logger.error({ err }, `Error checking magnet status`);
         // Utiliser analyzeError pour déterminer le type d'erreur
         const errorType = this.constructor.analyzeError(err);
         return { files: [], errorType };
       }
     } catch (err) {
-      console.error(`Error getting files from magnet: ${err.message}`);
+      logger.error({ err }, `Error getting files from magnet`);
       // Utiliser analyzeError pour déterminer le type d'erreur
       const errorType = this.constructor.analyzeError(err);
       return { files: [], errorType };
@@ -230,11 +231,11 @@ export default class StremThru {
       const parsedTorrent = await parseTorrent(new Uint8Array(buffer));
       const magnet = toMagnetURI(parsedTorrent);
 
-      console.log(`Converted torrent buffer to magnet: ${magnet}`);
+      logger.debug(`Converted torrent buffer to magnet: ${magnet}`);
 
       return this.getFilesFromMagnet(magnet, infoHash);
     } catch (err) {
-      console.error(`Error converting torrent buffer to magnet: ${err.message}`);
+      logger.error({ err }, `Error converting torrent buffer to magnet`);
 
       // Fallback to infoHash if available
       if (infoHash) {
@@ -263,9 +264,9 @@ export default class StremThru {
         // Mettre à jour les infos du torrent avec le lien magnet généré
         torrentInfos.magnetUrl = magnet;
 
-        console.log(`Converted torrent file to magnet: ${magnet}`);
+        logger.debug(`Converted torrent file to magnet: ${magnet}`);
       } catch (err) {
-        console.error(`Error converting torrent to magnet: ${err.message}`);
+        logger.error({ err }, `Error converting torrent to magnet`);
         // Utiliser analyzeError pour déterminer le type d'erreur
         const errorType = this.constructor.analyzeError(err);
 
@@ -292,7 +293,7 @@ export default class StremThru {
   async getDownload(file) {
     try {
       if (!file.id || file.id === 'undefined' || !file.id.includes(':')) {
-        console.error('No valid file.id available');
+        logger.error('No valid file.id available');
         return { notReady: true, errorType: 'not_ready', reason: 'No valid file.id' };
       }
 
@@ -300,12 +301,12 @@ export default class StremThru {
       const magnetInfo = await this.#request('GET', `/magnets/${magnetId}`);
 
       if (!magnetInfo || !magnetInfo.data) {
-        console.error('Failed to get magnet info');
+        logger.error('Failed to get magnet info');
         return { notReady: true, errorType: 'not_ready', reason: 'Failed to get magnet info' };
       }
 
       if (magnetInfo.data.status !== 'downloaded' && magnetInfo.data.status !== 'cached') {
-        console.log(`File not ready, status: ${magnetInfo.data.status}`);
+        logger.warn(`File not ready, status: ${magnetInfo.data.status}`);
         return { notReady: true, errorType: 'not_ready', reason: `File not ready, status: ${magnetInfo.data.status}` };
       }
 
@@ -315,7 +316,7 @@ export default class StremThru {
       });
 
       if (!targetFile || !targetFile.link) {
-        console.error('File not found or link not available');
+        logger.error('File not found or link not available');
         return { notReady: true, errorType: 'not_ready', reason: 'File not found or link not available' };
       }
 
@@ -324,13 +325,13 @@ export default class StremThru {
       });
 
       if (!linkRes || !linkRes.data || !linkRes.data.link) {
-        console.error('Failed to generate download link');
+        logger.error('Failed to generate download link');
         return { notReady: true, errorType: 'not_ready', reason: 'Failed to generate download link' };
       }
 
       return linkRes.data.link;
     } catch (err) {
-      console.error(`Error getting download link: ${err.message}`);
+      logger.error({ err }, `Error getting download link`);
       const errorType = this.constructor.analyzeError(err);
       return { notReady: true, errorType, reason: err.message };
     }
@@ -378,7 +379,7 @@ export default class StremThru {
           }
         }
       } catch (err) {
-        console.error(`Error checking torrent status: ${err.message}`);
+        logger.error({ err }, `Error checking torrent status`);
       }
     }
 
@@ -449,7 +450,7 @@ export default class StremThru {
           }
         }
       } catch (err) {
-        console.error(`Error initializing torrent statuses: ${err.message}`);
+        logger.error({ err }, `Error initializing torrent statuses`);
       }
     }
   }
@@ -476,7 +477,7 @@ export default class StremThru {
       try {
         const fullUrl = `${this.#baseUrl}/v0/store${path}`;
 
-        console.log(`StremThru API request: ${method} ${fullUrl}`);
+        logger.debug(`StremThru API request: ${method} ${fullUrl}`);
         const response = await fetch(fullUrl, opts);
         const data = await response.json();
 
@@ -495,7 +496,7 @@ export default class StremThru {
         }
 
         // Formater les erreurs non formatées
-        console.error(`StremThru request error: ${err.message}`);
+        logger.error({ err }, `StremThru request error`);
         const formattedError = new Error(`StremThru request error: ${err.message}`);
         formattedError.originalError = err;
         throw formattedError;
@@ -504,7 +505,7 @@ export default class StremThru {
 
     // Si on arrive ici, toutes les tentatives ont échoué
     if (lastError) {
-      console.error(`StremThru request failed after ${maxRetries} retries: ${lastError.message}`);
+      logger.error({ err: lastError }, `StremThru request failed after ${maxRetries} retries`);
       throw lastError;
     }
   }

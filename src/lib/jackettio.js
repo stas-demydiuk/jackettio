@@ -1,6 +1,7 @@
 import pLimit from 'p-limit';
 import { parseWords, numberPad, sortBy, bytesToSize, wait, promiseTimeout } from './util.js';
 import config from './config.js';
+import logger from './logger.ts';
 import cache from './cache.js';
 import { updateUserConfigWithMediaFlowIp, applyMediaflowProxyIfNeeded } from './mediaflowProxy.js';
 import { extractMediaInfo } from './mediaInfo.ts';
@@ -138,7 +139,7 @@ async function timeoutIndexerSearch(indexerId, promise, timeout) {
   const duration = new Date() - start;
   if (timeout > config.slowIndexerDuration) {
     if (duration > config.slowIndexerDuration) {
-      console.log(`Slow indexer detected : ${indexerId} : ${duration}ms`);
+      logger.warn(`Slow indexer detected : ${indexerId} : ${duration}ms`);
       slowIndexers[indexerId].push({ duration, date: new Date() });
     } else {
       slowIndexers[indexerId] = [];
@@ -211,7 +212,7 @@ async function getTorrents(userConfig, metaInfos, debridInstance) {
     if (userIndexers.length) {
       indexers = userIndexers;
     } else if (availableIndexers.length) {
-      console.log(
+      logger.warn(
         `${stremioId} : User defined indexers "${userConfig.indexers.join(', ')}" not available, fallback to all "${type}" indexers`
       );
       indexers = availableIndexers;
@@ -221,7 +222,7 @@ async function getTorrents(userConfig, metaInfos, debridInstance) {
       throw new Error(`${stremioId} : No indexer configured in jackett`);
     }
 
-    console.log(
+    logger.info(
       `${stremioId} : ${indexers.length} indexers selected : ${indexers.map((indexer) => indexer.title).join(', ')}`
     );
 
@@ -360,7 +361,7 @@ async function getTorrents(userConfig, metaInfos, debridInstance) {
       }
     }
 
-    // console.log(`${stremioId} : ${torrents.length} torrents filtered, get torrents infos ...`);
+    logger.debug(`${stremioId} : ${torrents.length} torrents filtered, get torrents infos ...`);
     startDate = new Date();
 
     const limit = pLimit(5);
@@ -371,10 +372,10 @@ async function getTorrents(userConfig, metaInfos, debridInstance) {
             torrent.infos = await promiseTimeout(torrentInfos.get(torrent), Math.min(30, indexerTimeoutSec) * 1000);
             return torrent;
           } catch (err) {
-            console.log(
+            logger.warn(
               `${stremioId} Failed getting torrent infos for ${torrent.id} from indexer ${torrent.indexerId}`
             );
-            console.log(`${stremioId} ${torrent.link.replace(/apikey=[a-z0-9\-]+/, 'apikey=****')}`, err);
+            logger.debug({ err }, `${stremioId} ${torrent.link.replace(/apikey=[a-z0-9\-]+/, 'apikey=****')}`);
             return false;
           }
         })
@@ -385,7 +386,7 @@ async function getTorrents(userConfig, metaInfos, debridInstance) {
       .filter((torrent, index, items) => items.findIndex((t) => t.infos.infoHash == torrent.infos.infoHash) === index)
       .slice(0, maxTorrents);
 
-    // console.log(`${stremioId} : ${torrents.length} torrents infos found in ${(new Date() - startDate) / 1000}s`);
+    logger.debug(`${stremioId} : ${torrents.length} torrents infos found in ${(new Date() - startDate) / 1000}s`);
 
     if (torrents.length == 0) {
       throw new Error(`No torrent infos for type ${type} and id ${stremioId}`);
@@ -465,7 +466,7 @@ async function getTorrents(userConfig, metaInfos, debridInstance) {
         const progress = await debridInstance.getProgressTorrents(torrents);
         torrents.forEach((torrent) => (torrent.progress = progress[torrent.infos.infoHash] || null));
       } catch (err) {
-        console.log(`${stremioId} : ${debridInstance.shortName} : ${err.message || err}`);
+        logger.warn({ err }, `${stremioId} : ${debridInstance.shortName} : ${err.message || err}`);
 
         if (err.message == debrid.ERROR.EXPIRED_API_KEY) {
           torrents.forEach((torrent) => {
@@ -517,14 +518,14 @@ async function prepareNextEpisode(userConfig, metaInfos, debridInstance) {
 
       // Cache next episode on debrid when not cached
       if (userConfig.forceCacheNextEpisode && torrents.length && !torrents.find((torrent) => torrent.isCached)) {
-        console.log(`${stremioId} : Force cache next episode (${metaInfos.episode}) on debrid`);
+        logger.info(`${stremioId} : Force cache next episode (${metaInfos.episode}) on debrid`);
         const bestTorrent = torrents.find((torrent) => !torrent.disabled);
         if (bestTorrent) await getDebridFiles(userConfig, bestTorrent.infos, debridInstance);
       }
     }
   } catch (err) {
     if (err.message != debrid.ERROR.NOT_READY) {
-      console.log('cache next episode:', err);
+      logger.error({ err }, 'cache next episode');
     }
   }
 }
@@ -625,7 +626,7 @@ export async function getStreams(userConfig, type, stremioId, publicUrl) {
         Object.assign(clickedHashes, JSON.parse(stored));
       }
     } catch (err) {
-      console.error('Error when retrieving clicked torrents:', err);
+      logger.error({ err }, 'Error when retrieving clicked torrents');
     }
   }
 
@@ -641,9 +642,9 @@ export async function getStreams(userConfig, type, stremioId, publicUrl) {
   if (debridInstance && debridInstance.constructor.id === 'stremthru' && debridInstance.initTorrentStatuses) {
     try {
       await debridInstance.initTorrentStatuses(torrents);
-      console.log(`${stremioId} : Torrent statuses initialized`);
+      logger.info(`${stremioId} : Torrent statuses initialized`);
     } catch (err) {
-      console.error(`Error when initializing statuses: ${err.message}`);
+      logger.error({ err }, `Error when initializing statuses`);
     }
   }
 
@@ -707,7 +708,7 @@ export async function getStreams(userConfig, type, stremioId, publicUrl) {
         sources.push(`dht:${torrent.infos.infoHash}`);
       }
       return {
-        name: `🧲 ${getQualityLabel(torrent)}`,
+        name: `[D] ${getQualityLabel(torrent)}`,
         description: rows.join('\n'),
         infoHash: torrent.infos.infoHash,
         ...(fileIdx !== undefined && fileIdx >= 0 ? { fileIdx } : {}),

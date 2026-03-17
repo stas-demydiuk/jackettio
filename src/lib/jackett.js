@@ -3,6 +3,7 @@ import { Parser } from 'xml2js';
 import config from './config.js';
 import cache from './cache.js';
 import { numberPad } from './util.js';
+import logger from './logger.ts';
 
 export const CATEGORY = {
   MOVIE: 2000,
@@ -204,6 +205,8 @@ export async function getIndexers() {
 }
 
 async function jackettApi(path, query) {
+  logger.debug(`Jackett API request: ${path} with query ${JSON.stringify(query)}`);
+
   const params = new URLSearchParams(query || {});
   params.set('apikey', config.jackettApiKey);
 

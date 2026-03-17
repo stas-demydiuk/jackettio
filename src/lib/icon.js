@@ -1,6 +1,7 @@
 import { writeFile, readFile } from 'node:fs/promises';
 import path from 'path';
 import config from './config.js';
+import logger from './logger.ts';
 
 let ICON_LOCATION = path.join(import.meta.dirname, '../static/img/icon.png');
 
@@ -28,7 +29,7 @@ export async function download() {
   const location = `${config.dataFolder}/icon.${extension}`;
   const buffer = await res.arrayBuffer();
   await writeFile(location, new Uint8Array(buffer));
-  console.log(`Icon downloaded: ${location}`);
+  logger.info(`Icon downloaded: ${location}`);
   ICON_LOCATION = location;
   return location;
 }

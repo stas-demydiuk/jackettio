@@ -5,12 +5,13 @@ import redisStore from 'cache-manager-ioredis';
 import Redis from 'ioredis';
 import config from './config.js';
 import { wait } from './util.js';
+import logger from './logger.ts';
 
 let cache;
 let db;
 
 if (config.cacheType === 'redis') {
-  console.log(`Using Redis cache: ${config.redisHost}:${config.redisPort}`);
+  logger.info(`Using Redis cache: ${config.redisHost}:${config.redisPort}`);
   const redisClient = new Redis({
     host: config.redisHost,
     port: config.redisPort,
@@ -20,7 +21,7 @@ if (config.cacheType === 'redis') {
   });
 
   redisClient.on('error', (err) => {
-    console.error('Redis Cache Error:', err);
+    logger.error({ err }, 'Redis Cache Error');
   });
 
   cache = await cacheManager.caching({
@@ -28,8 +29,15 @@ if (config.cacheType === 'redis') {
     redisInstance: redisClient,
     ttl: 86400,
   });
+} else if (config.cacheType === 'memory') {
+  logger.info('Using in-memory cache');
+
+  cache = await cacheManager.caching({
+    store: 'memory',
+    ttl: 86400,
+  });
 } else {
-  console.log(`Using SQLite cache: ${config.dataFolder}/cache.db`);
+  logger.info(`Using SQLite cache: ${config.dataFolder}/cache.db`);
   db = new sqlite3.Database(`${config.dataFolder}/cache.db`);
 
   cache = await cacheManager.caching({
@@ -43,30 +51,30 @@ export default cache;
 
 export async function clean() {
   if (config.cacheType !== 'sqlite') {
-    console.warn('Cache clean() is only applicable for SQLite cache.');
+    logger.warn('Cache clean() is only applicable for SQLite cache.');
     return;
   }
-  console.log('Cleaning SQLite cache...');
+  logger.info('Cleaning SQLite cache...');
   await cache.set('_clean', 'todo', { ttl: 1 });
   await wait(3e3);
   await cache.get('_clean');
-  console.log('SQLite cache cleaned.');
+  logger.info('SQLite cache cleaned.');
 }
 
 export async function vacuum() {
   if (config.cacheType !== 'sqlite') {
-    console.warn('Cache vacuum() is only applicable for SQLite cache.');
+    logger.warn('Cache vacuum() is only applicable for SQLite cache.');
     return;
   }
-  console.log('Vacuuming SQLite cache database...');
+  logger.info('Vacuuming SQLite cache database...');
   return new Promise((resolve, reject) => {
     db.serialize(() => {
       db.run('VACUUM', (err) => {
         if (err) {
-          console.error('Error vacuuming SQLite DB:', err);
+          logger.error({ err }, 'Error vacuuming SQLite DB');
           return reject(err);
         }
-        console.log('SQLite cache database vacuumed.');
+        logger.info('SQLite cache database vacuumed.');
         resolve();
       });
     });

@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { URL } from 'url';
 import path from 'path';
 import cache from './cache.js';
+import logger from './logger.ts';
 
 const PRIVATE_CIDR = /^(10\.|127\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)/;
 
@@ -47,7 +48,7 @@ async function getMediaflowProxyPublicIp(userConfig) {
       return publicIp;
     }
   } catch (error) {
-    console.error('An error occurred:', error);
+    logger.error({ err: error }, 'An error occurred');
   }
 
   return null;

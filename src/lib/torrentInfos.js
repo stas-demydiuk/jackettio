@@ -5,6 +5,7 @@ import parseTorrent from 'parse-torrent';
 import { toMagnetURI } from 'parse-torrent';
 import cache from './cache.js';
 import config from './config.js';
+import logger from './logger.ts';
 
 const TORRENT_FOLDER = `${config.dataFolder}/torrents`;
 const CACHE_FILE_DAYS = 7;
@@ -27,9 +28,9 @@ export async function cleanTorrentFolder() {
 }
 
 export async function get({ link, id, magnetUrl, infoHash, name, size, type }) {
-  try {
-    return await getById(id);
-  } catch (err) {}
+  // try {
+  //   return await getById(id);
+  // } catch (err) {}
 
   let parseInfos = null;
   let torrentLocation = '';
@@ -84,6 +85,11 @@ export async function get({ link, id, magnetUrl, infoHash, name, size, type }) {
   if (!parseInfos) {
     throw new Error(`Invalid link ${link}`);
   }
+
+  logger.debug(
+    { name: parseInfos.name, infoHash: parseInfos.infoHash, files: parseInfos.files },
+    'parsed torrent infos'
+  );
 
   const torrentInfos = {
     id,

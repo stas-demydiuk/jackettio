@@ -1,6 +1,7 @@
 import { createHash } from 'crypto';
 import { ERROR } from './const.js';
 import { wait } from '../util.js';
+import logger from '../logger.ts';
 
 export default class AllDebrid {
   static id = 'alldebrid';
@@ -116,7 +117,7 @@ export default class AllDebrid {
     const data = await res.json();
 
     if (data.status != 'success') {
-      console.log(data);
+      logger.warn({ data }, 'AllDebrid API error');
       switch (data.error.code || '') {
         case 'AUTH_BAD_APIKEY':
         case 'AUTH_MISSING_APIKEY':

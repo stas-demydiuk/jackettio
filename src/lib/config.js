@@ -3,6 +3,8 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 export default {
+  // Log level: trace, debug, info, warn, error, fatal
+  logLevel: process.env.LOG_LEVEL || 'info',
   // Server port
   port: parseInt(process.env.PORT || 4000),
   // https://expressjs.com/en/guide/behind-proxies.html

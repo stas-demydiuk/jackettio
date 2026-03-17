@@ -690,10 +690,10 @@ export async function getStreams(userConfig, type, stremioId, publicUrl) {
         description: rows.join('\n'),
         infoHash: torrent.infos.infoHash,
         ...(fileIdx !== undefined && fileIdx >= 0 ? { fileIdx } : {}),
-        ...(sources.length ? { sources } : {}),
+        // ...(sources.length ? { sources } : {}),
         behaviorHints: {
           bingeGroup: `${config.addonName}-nodebrid-${torrent.quality}`,
-          filename: torrent.infos.name,
+          filename: file.name || torrent.name,
           videoSize: file.size || torrent.size,
         },
       };
